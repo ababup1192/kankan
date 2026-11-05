@@ -5,6 +5,7 @@ viewport-fit=cover を外し、canvas の高さをブラウザのツールバー
 """
 import pathlib
 import re
+import shutil
 import sys
 
 page = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "build/web/index.html")
@@ -44,6 +45,10 @@ fit = """<style>
 </script>
 """
 html = re.sub(r"<style>\n  html, body \{ position: fixed.*?</script>\n", "", html, flags=re.S)
+icon = '<link rel="icon" type="image/png" href="favicon.png">\n<link rel="apple-touch-icon" href="favicon.png">\n'
+if "favicon.png" not in html:
+    html = html.replace("</head>", icon + "</head>", 1)
+shutil.copy(pathlib.Path(__file__).parent.parent / "assets/favicon.png", page.with_name("favicon.png"))
 html = html.replace("</head>", fit + "</head>", 1)
 page.write_text(html, encoding="utf-8")
 print("fit-page:", page)
