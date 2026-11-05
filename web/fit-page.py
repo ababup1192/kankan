@@ -20,7 +20,7 @@ fit = """<style>
   function fit() {
     var v = window.visualViewport;
     var root = document.documentElement.style;
-    root.setProperty("--fit-height", (v ? v.height : window.innerHeight) + "px");
+    root.setProperty("--fit-height", Math.min(v ? v.height : Infinity, window.innerHeight, document.documentElement.clientHeight || Infinity) + "px");
     root.setProperty("--fit-top", (v ? v.offsetTop : 0) + "px");
     window.scrollTo(0, 0);
   }

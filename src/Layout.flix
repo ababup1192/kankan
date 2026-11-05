@@ -168,7 +168,8 @@ mod Layout {
     def buttonTop(fit: Fit): Float64 = match fit {
         case Fit.Regular        => 512.0
         case Fit.Small(s)       => height(fit) - s#buttonHeight
-        case Fit.Portrait(p, _) => height(fit) - 56.0 - p#buttonHeight
+        // WhyNot: 下端に寄せない — 下にツールバーを重ねるブラウザは、隠している高さを頁へ知らせない。
+        case Fit.Portrait(p, _) => height(fit) - 124.0 - p#buttonHeight
     }
 
     /// i 番目のボタン（count 個を画面の真ん中に並べる）。Small は左右に 8px ずつ残して画面の幅を同じ幅で分ける。
