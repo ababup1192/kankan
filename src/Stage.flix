@@ -243,6 +243,8 @@ mod Stage {
         case "door"     => 1.0
         case "stairs"   => 1.6
         case "run"      => 2.4
+        case "laugh_woman" => 5.2
+        case "laugh_mother" => 3.9
         case "creak"    => 1.8
         case "frontdoor" => 1.8
         case "autodoor" => 1.4

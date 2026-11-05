@@ -466,6 +466,7 @@ title: Face
 <<wait 1.2>>
 <<text top large center>>
 <<speed 0.27>>
+<<se laugh_woman>>
 「あなたも・・・あなた達家族もお終いね。ふふふ」
 <<ambience off>>
 <<clear>>
@@ -733,6 +734,7 @@ title: Call
 <<wait 3.0>>
 <<text mid large center>>
 <<speed 0.29>>
+<<se laugh_mother>>
 『あなたのお母さんよ。ふふふ』
 <<clear>>
 <<se hang>>

@@ -313,6 +313,16 @@
       "name": "se_pant",
       "path": "assets/sfx/se_pant.wav",
       "looping": false
+    },
+    {
+      "name": "se_laugh_woman",
+      "path": "assets/sfx/se_laugh_woman.wav",
+      "looping": false
+    },
+    {
+      "name": "se_laugh_mother",
+      "path": "assets/sfx/se_laugh_mother.wav",
+      "looping": false
     }
   ],
   "editor": {
