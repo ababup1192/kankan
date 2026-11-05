@@ -242,6 +242,7 @@ mod Stage {
         case "busy"     => 3.5
         case "door"     => 1.0
         case "stairs"   => 1.6
+        case "run"      => 2.4
         case "knock"    => 0.3
         case "switch"   => 0.3
         case _          => 0.0

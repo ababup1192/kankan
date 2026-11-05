@@ -288,6 +288,11 @@
       "name": "ui_save",
       "path": "assets/sfx/ui_save.wav",
       "looping": false
+    },
+    {
+      "name": "se_run",
+      "path": "assets/sfx/se_run.wav",
+      "looping": false
     }
   ],
   "editor": {
