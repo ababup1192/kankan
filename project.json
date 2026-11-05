@@ -293,6 +293,26 @@
       "name": "se_run",
       "path": "assets/sfx/se_run.wav",
       "looping": false
+    },
+    {
+      "name": "se_creak",
+      "path": "assets/sfx/se_creak.wav",
+      "looping": false
+    },
+    {
+      "name": "se_frontdoor",
+      "path": "assets/sfx/se_frontdoor.wav",
+      "looping": false
+    },
+    {
+      "name": "se_autodoor",
+      "path": "assets/sfx/se_autodoor.wav",
+      "looping": false
+    },
+    {
+      "name": "se_pant",
+      "path": "assets/sfx/se_pant.wav",
+      "looping": false
     }
   ],
   "editor": {

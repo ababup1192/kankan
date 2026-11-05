@@ -70,18 +70,17 @@ title: Ceiling
 普段よりずっと早い就寝だったので、その時私はなかなか眠れず、しばらくの間ぼーっと天井を眺めていました。
 <<ambience off>>
 <<wait 1.4>>
+<<se kan_far>>
 すると突然。静まり返った部屋で、「カン、カン」という変な音が響いだのです。
 <<clear>>
-<<se kan_far>>
-<<wait 2.8>>
+<<wait 1.0>>
 <<shake>>
 私は布団からガバッと起き、暗い部屋を見回しました。しかし、そこには何もない。
 <<clear>>
 <<wait 0.8>>
-<<se kan_far>>
-<<wait 2.0>>
 <<text mid large center>>
-<<speed 0.32>>
+<<speed 0.12>>
+<<se kan_far>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -292,10 +291,9 @@ title: Study
 <<clear>>
 <<ambience off>>
 <<wait 1.2>>
-<<se kan_door>>
-<<wait 2.2>>
 <<text mid large center>>
-<<speed 0.4>>
+<<speed 0.12>>
+<<se kan_door>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -308,10 +306,9 @@ title: Study
 これはアレだ。小さい頃に母が風邪をひいて、私が代わって消灯をした時の・・・
 <<clear>>
 <<wait 0.8>>
-<<se kan_door>>
-<<wait 2.2>>
 <<text mid large center>>
-<<speed 0.4>>
+<<speed 0.12>>
+<<se kan_door>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -352,10 +349,9 @@ title: Wall
 <<wait 0.7>>
 そしてもう１度あの音が。
 <<clear>>
-<<se kan_door>>
-<<wait 2.2>>
 <<text mid large center>>
-<<speed 0.34>>
+<<speed 0.12>>
+<<se kan_door>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -375,6 +371,7 @@ title: Corridor
 <<bg corridor moon 3.3>>
 <<wait 2.5>>
 <<zoom 1.18 16>>
+<<se creak>>
 そっと部屋の扉を開けました。真っ暗な短い廊下の向こう側にある居間。
 そこはカーテンから漏れる青白い外の光でぼんやりと照らし出されていた。
 <<wait 1.0>>
@@ -399,13 +396,10 @@ title: WomanAgain
 <<clear>>
 <<ambience off>>
 <<wait 1.6>>
+<<text mid large center>>
+<<speed 0.12>>
 <<se kan>>
 <<shake>>
-<<wait 0.95>>
-<<shake>>
-<<wait 1.2>>
-<<text mid large center>>
-<<speed 0.28>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -516,6 +510,7 @@ title: Entry
 <<zoom 1.14 18>>
 <<wait 1.4>>
 異変はその日のうちに起こりました。
+<<se frontdoor>>
 私が夕方頃、学校から帰ってきて玄関のドアを開けた時です。
 いつもなら居間には母がいて、キッチンで夕食を作っているはずであるのに、居間の方は真っ暗でした。
 電気が消えています。
@@ -531,13 +526,10 @@ title: Entry
 やれやれと思いながら、靴を脱いで家に上がろうとしたその瞬間、
 <<clear>>
 <<wait 0.8>>
+<<text mid huge center>>
+<<speed 0.12>>
 <<se kan>>
 <<shake>>
-<<wait 0.95>>
-<<shake>>
-<<wait 1.0>>
-<<text mid huge center>>
-<<speed 0.4>>
 カン、カン
 <<clear>>
 <<text bottom normal left>>
@@ -591,7 +583,10 @@ title: Store
 <<dim 0 2.0>>
 <<wait 0.6>>
 すっかり暗くなった路地を走りに走った挙句、私は近くのスーパーに来ていました。
+<<se pant>>
 「お母さん、きっと買い物してるよね」と一人で呟き、切れた息を取り戻しながら中に入りました。
+<<se autodoor>>
+<<wait 1.2>>
 <<clear>>
 <<wait 0.7>>
 時間帯が時間帯なので、店の中に人はあまりいなかった。

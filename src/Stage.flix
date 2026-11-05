@@ -243,6 +243,10 @@ mod Stage {
         case "door"     => 1.0
         case "stairs"   => 1.6
         case "run"      => 2.4
+        case "creak"    => 1.8
+        case "frontdoor" => 1.8
+        case "autodoor" => 1.4
+        case "pant"     => 1.2
         case "knock"    => 0.3
         case "switch"   => 0.3
         case _          => 0.0
