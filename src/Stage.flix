@@ -13,6 +13,7 @@
 //   <<zoom 倍率 秒>>          背景を秒かけて寄せる（秒 0 ですぐ）
 //   <<text 位置 大きさ 揃え>> 字の置き場 top / mid / bottom・大きさ small / normal / large / huge・揃え left / center
 //   <<speed 倍率>>            字の出る速さの倍率
+//   <<hold 秒>>               秒の間、タップで字を飛ばせなくする
 //
 // 引数の読めないコマンドは Err で返し、World が 1 行知らせて舞台はそのまま続ける（シナリオの書き損じで止めない）。
 // セーブから戻る時は YarnRunner.resume が通ったコマンドを全部返すので、同じ applyCue で反映してから settle で
@@ -79,12 +80,13 @@ mod Stage {
         case Zoom(Float64, Float64)
         case Text(TextStyle)
         case Speed(Float64)
+        case Hold(Float64)
     }
 
     /// 舞台。shot = 今の背景、under = 重ねている間だけ下に残す前の背景、underZoom = 前の背景の寄りの倍率、
     /// fadeFrom / fadeSeconds = 重ね始めた時刻と長さ、mode = 文章の出し方、ambience = 鳴り続ける環境音の名前、
     /// particles = パーティクルの演出の名前、shakeFrom = 揺れ始めた時刻と強さ、dim = 黒の濃さ、flash = 白飛びの始まりと長さ、
-    /// zoom = 背景の寄りの倍率、text = 字の見せ方、speed = 字の出る速さの倍率。
+    /// zoom = 背景の寄りの倍率、text = 字の見せ方、speed = 字の出る速さの倍率、hold = 効果音を聞かせる間、送りを受けない時刻。
     pub type alias Stage = {
         shot = Option[Shot],
         under = Option[Shot],
@@ -99,7 +101,8 @@ mod Stage {
         flash = Option[(Clock.Time[Story], Float64)],
         zoom = Ramp,
         text = TextStyle,
-        speed = Float64
+        speed = Float64,
+        hold = Option[Clock.Time[Story]]
     }
 
     def restAt(value: Float64): Ramp = { initial = value, target = value, start = Clock.never(), seconds = 0.0 }
@@ -108,11 +111,11 @@ mod Stage {
     pub def empty(): Stage =
         { shot = None, under = None, underZoom = 1.0, fadeFrom = Clock.never(), fadeSeconds = 0.0, mode = Mode.Nvl,
           ambience = None, particles = None, shakeFrom = None, dim = restAt(0.0), flash = None, zoom = restAt(1.0),
-          text = { pos = TextPos.Bottom, size = TextSize.Normal, align = TextAlign.Left }, speed = 1.0 }
+          text = { pos = TextPos.Bottom, size = TextSize.Normal, align = TextAlign.Left }, speed = 1.0, hold = None }
 
     /// Talk の語彙に載せるコマンドの名前（wait はエンジンが読むので入れない）。
     pub def commandNames(): List[String] =
-        "bg" :: "nvl" :: "adv" :: "clear" :: "ambience" :: "se" :: "fx" :: "shake" :: "dim" :: "flash" :: "zoom" :: "text" :: "speed" :: Nil
+        "bg" :: "nvl" :: "adv" :: "clear" :: "ambience" :: "se" :: "fx" :: "shake" :: "dim" :: "flash" :: "zoom" :: "text" :: "speed" :: "hold" :: Nil
 
     /// パーティクルの演出の名前（<<fx 名>> に書ける物）。
     pub def particleNames(): List[String] = "fireflies" :: Nil
@@ -182,6 +185,7 @@ mod Stage {
             case ("zoom", a :: b :: _)  => two(a, b, (x, y) -> Cue.Zoom(Float64.max(1.0, x), y))
             case ("flash", a :: _)      => two(a, "0", (x, _) -> Cue.Flash(x))
             case ("speed", a :: _)      => two(a, "0", (x, _) -> Cue.Speed(Float64.max(0.05, x)))
+            case ("hold", a :: _)       => two(a, "0", (x, _) -> Cue.Hold(x))
             case ("text", p :: s :: a :: _) =>
                 match (posOf(p), sizeOf(s), alignOf(a)) {
                     case (Some(pos), Some(size), Some(align)) => Ok(Cue.Text({ pos = pos, size = size, align = align }))
@@ -214,14 +218,44 @@ mod Stage {
         case Cue.Zoom(to, seconds)  => { zoom = rampTo(now, to, seconds, stage#zoom) | stage }
         case Cue.Text(style)        => { text = style | stage }
         case Cue.Speed(rate)        => { speed = rate | stage }
+        case Cue.Hold(seconds)      => { hold = Some(Clock.after(seconds, now)) | stage }
         case Cue.Clear              => stage
         case Cue.Se(_)              => stage
     }
 
     /// 演出の途中を終わりの形にする（セーブから戻った時・描き出しで場面を作る時）。
     pub def settle(stage: Stage): Stage =
-        { under = None, fadeFrom = Clock.never(), shakeFrom = None, flash = None,
+        { under = None, fadeFrom = Clock.never(), shakeFrom = None, flash = None, hold = None,
           dim = restAt(stage#dim#target), zoom = restAt(stage#zoom#target) | stage }
+
+    /// 効果音 name を聞かせる秒（この間は送りを受けない）。
+    def holdSecondsOf(name: String): Float64 = match name {
+        case "kan"      => 2.8
+        case "kan_door" => 2.8
+        case "kan_far"  => 2.8
+        case "hit"      => 2.0
+        case "ring"     => 1.1
+        case "dial"     => 1.8
+        case "coin"     => 0.9
+        case "pick"     => 0.5
+        case "hang"     => 0.5
+        case "busy"     => 3.5
+        case "door"     => 1.0
+        case "stairs"   => 1.6
+        case "knock"    => 0.3
+        case "switch"   => 0.3
+        case _          => 0.0
+    }
+
+    /// 効果音を鳴らした時の舞台（聞かせる間だけ送りを止める）。
+    pub def holdFor(now: Clock.Time[Story], name: String, stage: Stage): Stage =
+        { hold = Some(Clock.after(holdSecondsOf(name), now)) | stage }
+
+    /// 今は効果音を聞かせている間か。
+    pub def isHeld(now: Clock.Time[Story], stage: Stage): Bool = match stage#hold {
+        case Some(until) => Clock.since(until, now) < 0.0
+        case None        => false
+    }
 
     /// 背景の重ねの進み（0〜1。秒が 0 なら 1）。
     pub def fadeProgress(now: Clock.Time[Story], stage: Stage): Float64 =

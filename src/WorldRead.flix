@@ -96,7 +96,7 @@ mod WorldRead {
         if (command#name == "wait") r
         else match Stage.cueOf(res#backdrops, command) {
             case Ok(Stage.Cue.Clear)        => { page = Page.clear(r#page) | r }
-            case Ok(Stage.Cue.Se(name))     => if (replay == Replay.Silent) r else { Emit.emit(World.Event.Cue("se_${name}")); r }
+            case Ok(Stage.Cue.Se(name))     => if (replay == Replay.Silent) r else { Emit.emit(World.Event.Cue("se_${name}")); { stage = Stage.holdFor(World.now(w), name, r#stage) | r } }
             case Ok(Stage.Cue.ToMode(mode)) =>
                 let page = if (mode == r#stage#mode) r#page else Page.clear(r#page);
                 { stage = Stage.applyCue(World.now(w), Stage.Cue.ToMode(mode), r#stage), page = page | r }
@@ -131,7 +131,7 @@ mod WorldRead {
     /// 選択肢を出している間は動かない（pick だけが進める）。オートとスキップは止める（人が押したら人の速さに戻す）。
     pub def advance(res: Res.Res, w: World.World): World.World \ Emit[World.Event] =
         match World.readOf(w) {
-            case Some(r) if World.isFree(w) and List.isEmpty(r#choices) =>
+            case Some(r) if World.isFree(w) and List.isEmpty(r#choices) and not Stage.isHeld(World.now(w), r#stage) =>
                 let manual = { playback = World.Playback.Manual | r };
                 if (not Page.isDone(r#page)) {
                     Emit.emit(World.Event.Revealed);

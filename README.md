@@ -23,6 +23,6 @@
 | `make test` | Doc の検査 |
 | `make render SHOT=portrait-woman` | 場面を `debug/` へ描き出す |
 
-ブラウザ版は engine 側で `make sync-engine-full-web` を流してから、`bin/fge export-web . --id kankan`。出力の `build/web` を `gh-pages` ブランチへ置く。
+ブラウザ版は engine 側で `make sync-engine-full-web` を流してから、`bin/fge export-web . --id kankan` の後に `python3 web/fit-page.py`（スマホの見えている範囲に収める）。出力の `build/web` を `gh-pages` ブランチへ置く。
 
 素材の出典は [CREDITS.md](CREDITS.md)。

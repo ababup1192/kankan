@@ -309,6 +309,27 @@
       "skyReach": 0.5,
       "vignette": 0.6,
       "focusPull": 0.6
+    },
+    "face": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.4,
+      "exposure": 0.85,
+      "tint": [
+        0.86,
+        0.93,
+        1.14
+      ],
+      "lift": [
+        0,
+        0.008,
+        0.025
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.6,
+      "focusPull": 0.6
     }
   }
 }

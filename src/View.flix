@@ -77,7 +77,7 @@ mod View {
         };
         let screen = if (covered) Nil else match w#scene {
             case World.Scene.Title(item)      => title(atlas, env, item)
-            case World.Scene.Credits(startedAt, _) => credits(atlas, env, startedAt)
+            case World.Scene.Credits(startedAt, _) => credits(atlas, env, startedAt) |> List.map(fadeTo(Float64.min(1.0, Clock.since(startedAt, env#realNow) / 3.0)))
             case World.Scene.Reading(r)       => if (w#panel == World.Panel.Hidden) Nil else shaken(env, r, reading(atlas, env, r))
         };
         List.flatten(screen :: panel(res, atlas, env, w) :: askLayer(atlas, env, w#ask) :: toast(atlas, env, World.toastOf(res, w)) :: Nil)

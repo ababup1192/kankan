@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""書き出した build/web/index.html を、スマホの見えている範囲に収まる形へ直す（export-web の後に流す）。
+
+viewport-fit=cover を外し、canvas の高さをブラウザのツールバーを除いた高さ（visualViewport）にそろえる。
+"""
+import pathlib
+import sys
+
+page = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else "build/web/index.html")
+html = page.read_text(encoding="utf-8")
+html = html.replace(", viewport-fit=cover", "")
+
+fit = """<style>
+  html, body { position: fixed; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+  body.fge-portrait-design:not(.fge-pad-on) #fge-canvas { top: var(--fit-top, 0px) !important; height: var(--fit-height, 100dvh) !important; }
+</style>
+<script>
+(function () {
+  function fit() {
+    var v = window.visualViewport;
+    var root = document.documentElement.style;
+    root.setProperty("--fit-height", (v ? v.height : window.innerHeight) + "px");
+    root.setProperty("--fit-top", (v ? v.offsetTop : 0) + "px");
+    window.scrollTo(0, 0);
+  }
+  // iOS は押せる物でない所のタップに click を出さないので、「タップで始める」の間だけ touchend を click へ替える。
+  document.addEventListener("touchend", function () {
+    var start = document.getElementById("fge-start");
+    if (start && getComputedStyle(start).display !== "none") window.dispatchEvent(new MouseEvent("click"));
+  }, { passive: true });
+  fit();
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", fit);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", fit);
+    window.visualViewport.addEventListener("scroll", fit);
+  }
+})();
+</script>
+"""
+if "--fit-height" not in html:
+    html = html.replace("</head>", fit + "</head>", 1)
+page.write_text(html, encoding="utf-8")
+print("fit-page:", page)
