@@ -1,0 +1,321 @@
+{
+ "id": "kankan",
+ "title": "カン、カン",
+ "files": [
+  "assets/OFL.txt",
+  "assets/backdrops.schema.json",
+  "assets/credits.schema.json",
+  "assets/keys.schema.json",
+  "assets/kind.schema.json",
+  "assets/novel.backdrops.json",
+  "assets/novel.credits.json",
+  "assets/novel.keys.json",
+  "assets/novel.kind.json",
+  "assets/novel.mixer.json",
+  "assets/novel.portrait.json",
+  "assets/novel.small.json",
+  "assets/novel.story.json",
+  "assets/novel.theme.json",
+  "assets/portrait.schema.json",
+  "assets/small.schema.json",
+  "assets/story.schema.json",
+  "assets/talk/dialogue.json",
+  "assets/talk/kankan.yarn",
+  "assets/talk/vocab.json",
+  "assets/theme.schema.json",
+  "font-atlas/default.fontatlas",
+  "project.json"
+ ],
+ "images": [
+  "assets/bg/alley.jpg",
+  "assets/bg/bed.jpg",
+  "assets/bg/bedroom.jpg",
+  "assets/bg/blue.jpg",
+  "assets/bg/breakfast.jpg",
+  "assets/bg/ceiling.jpg",
+  "assets/bg/corridor.jpg",
+  "assets/bg/desk.jpg",
+  "assets/bg/door.jpg",
+  "assets/bg/entry.jpg",
+  "assets/bg/face.jpg",
+  "assets/bg/hammer.jpg",
+  "assets/bg/kitchen.jpg",
+  "assets/bg/living.jpg",
+  "assets/bg/livingphone.jpg",
+  "assets/bg/payphone.jpg",
+  "assets/bg/receiver.jpg",
+  "assets/bg/sister.jpg",
+  "assets/bg/sisterdown.jpg",
+  "assets/bg/stairs.jpg",
+  "assets/bg/store.jpg",
+  "assets/bg/switch.jpg",
+  "assets/bg/wall.jpg",
+  "assets/bg/woman.jpg"
+ ],
+ "sounds": [
+  {
+   "name": "amb_room",
+   "path": "assets/sfx/amb_room.wav",
+   "looping": true,
+   "seconds": 12
+  },
+  {
+   "name": "amb_drone",
+   "path": "assets/sfx/amb_drone.wav",
+   "looping": true,
+   "seconds": 40
+  },
+  {
+   "name": "amb_tension",
+   "path": "assets/sfx/amb_tension.wav",
+   "looping": true,
+   "seconds": 13
+  },
+  {
+   "name": "amb_title",
+   "path": "assets/sfx/amb_title.wav",
+   "looping": true,
+   "seconds": 19
+  },
+  {
+   "name": "amb_clock",
+   "path": "assets/sfx/amb_clock.wav",
+   "looping": true,
+   "seconds": 3.9
+  },
+  {
+   "name": "amb_morning",
+   "path": "assets/sfx/amb_morning.wav",
+   "looping": true,
+   "seconds": 24
+  },
+  {
+   "name": "amb_evening",
+   "path": "assets/sfx/amb_evening.wav",
+   "looping": true,
+   "seconds": 24
+  },
+  {
+   "name": "amb_store",
+   "path": "assets/sfx/amb_store.wav",
+   "looping": true,
+   "seconds": 40
+  },
+  {
+   "name": "amb_heart",
+   "path": "assets/sfx/amb_heart.wav",
+   "looping": true,
+   "seconds": 9.5
+  },
+  {
+   "name": "amb_line",
+   "path": "assets/sfx/amb_line.wav",
+   "looping": true,
+   "seconds": 9.884897959183673
+  },
+  {
+   "name": "se_kan",
+   "path": "assets/sfx/se_kan.wav",
+   "looping": false,
+   "seconds": 4.7
+  },
+  {
+   "name": "se_kan_door",
+   "path": "assets/sfx/se_kan_door.wav",
+   "looping": false,
+   "seconds": 4.7
+  },
+  {
+   "name": "se_kan_far",
+   "path": "assets/sfx/se_kan_far.wav",
+   "looping": false,
+   "seconds": 4.79
+  },
+  {
+   "name": "se_ring",
+   "path": "assets/sfx/se_ring.wav",
+   "looping": false,
+   "seconds": 1.2698541666666667
+  },
+  {
+   "name": "se_pick",
+   "path": "assets/sfx/se_pick.wav",
+   "looping": false,
+   "seconds": 0.55
+  },
+  {
+   "name": "se_hang",
+   "path": "assets/sfx/se_hang.wav",
+   "looping": false,
+   "seconds": 0.55
+  },
+  {
+   "name": "se_coin",
+   "path": "assets/sfx/se_coin.wav",
+   "looping": false,
+   "seconds": 0.95
+  },
+  {
+   "name": "se_busy",
+   "path": "assets/sfx/se_busy.wav",
+   "looping": false,
+   "seconds": 4
+  },
+  {
+   "name": "se_switch",
+   "path": "assets/sfx/se_switch.wav",
+   "looping": false,
+   "seconds": 0.18
+  },
+  {
+   "name": "se_knock",
+   "path": "assets/sfx/se_knock.wav",
+   "looping": false,
+   "seconds": 0.22
+  },
+  {
+   "name": "se_dial",
+   "path": "assets/sfx/se_dial.wav",
+   "looping": false,
+   "seconds": 2.67
+  },
+  {
+   "name": "se_hit",
+   "path": "assets/sfx/se_hit.wav",
+   "looping": false,
+   "seconds": 2.6
+  },
+  {
+   "name": "se_door",
+   "path": "assets/sfx/se_door.wav",
+   "looping": false,
+   "seconds": 1.4
+  },
+  {
+   "name": "se_stairs",
+   "path": "assets/sfx/se_stairs.wav",
+   "looping": false,
+   "seconds": 6
+  },
+  {
+   "name": "ui_page",
+   "path": "assets/sfx/ui_page.wav",
+   "looping": false,
+   "seconds": 0.14
+  },
+  {
+   "name": "ui_cursor",
+   "path": "assets/sfx/ui_cursor.wav",
+   "looping": false,
+   "seconds": 0.04
+  },
+  {
+   "name": "ui_choice",
+   "path": "assets/sfx/ui_choice.wav",
+   "looping": false,
+   "seconds": 1.6860997732426304
+  },
+  {
+   "name": "ui_open",
+   "path": "assets/sfx/ui_open.wav",
+   "looping": false,
+   "seconds": 0.9268253968253968
+  },
+  {
+   "name": "ui_save",
+   "path": "assets/sfx/ui_save.wav",
+   "looping": false,
+   "seconds": 2.4704308390022676
+  },
+  {
+   "name": "se_run",
+   "path": "assets/sfx/se_run.wav",
+   "looping": false,
+   "seconds": 3.2
+  },
+  {
+   "name": "se_creak",
+   "path": "assets/sfx/se_creak.wav",
+   "looping": false,
+   "seconds": 3.2
+  },
+  {
+   "name": "se_frontdoor",
+   "path": "assets/sfx/se_frontdoor.wav",
+   "looping": false,
+   "seconds": 4.4
+  },
+  {
+   "name": "se_autodoor",
+   "path": "assets/sfx/se_autodoor.wav",
+   "looping": false,
+   "seconds": 3.4
+  },
+  {
+   "name": "se_pant",
+   "path": "assets/sfx/se_pant.wav",
+   "looping": false,
+   "seconds": 4
+  },
+  {
+   "name": "se_laugh_woman",
+   "path": "assets/sfx/se_laugh_woman.wav",
+   "looping": false,
+   "seconds": 4
+  },
+  {
+   "name": "se_laugh_mother",
+   "path": "assets/sfx/se_laugh_mother.wav",
+   "looping": false,
+   "seconds": 4
+  }
+ ],
+ "design": {
+  "w": 540,
+  "h": 960
+ },
+ "touchGestures": {
+  "longPress": "KeyX",
+  "swipeLeft": "PageUp"
+ },
+ "orientation": "portrait",
+ "transcoded": {
+  "assets/sfx/amb_clock.wav": "assets/sfx/amb_clock.webm",
+  "assets/sfx/amb_drone.wav": "assets/sfx/amb_drone.webm",
+  "assets/sfx/amb_evening.wav": "assets/sfx/amb_evening.webm",
+  "assets/sfx/amb_heart.wav": "assets/sfx/amb_heart.webm",
+  "assets/sfx/amb_line.wav": "assets/sfx/amb_line.webm",
+  "assets/sfx/amb_morning.wav": "assets/sfx/amb_morning.webm",
+  "assets/sfx/amb_room.wav": "assets/sfx/amb_room.webm",
+  "assets/sfx/amb_store.wav": "assets/sfx/amb_store.webm",
+  "assets/sfx/amb_tension.wav": "assets/sfx/amb_tension.webm",
+  "assets/sfx/amb_title.wav": "assets/sfx/amb_title.webm",
+  "assets/sfx/se_autodoor.wav": "assets/sfx/se_autodoor.webm",
+  "assets/sfx/se_busy.wav": "assets/sfx/se_busy.webm",
+  "assets/sfx/se_coin.wav": "assets/sfx/se_coin.webm",
+  "assets/sfx/se_creak.wav": "assets/sfx/se_creak.webm",
+  "assets/sfx/se_dial.wav": "assets/sfx/se_dial.webm",
+  "assets/sfx/se_door.wav": "assets/sfx/se_door.webm",
+  "assets/sfx/se_frontdoor.wav": "assets/sfx/se_frontdoor.webm",
+  "assets/sfx/se_hang.wav": "assets/sfx/se_hang.webm",
+  "assets/sfx/se_hit.wav": "assets/sfx/se_hit.webm",
+  "assets/sfx/se_kan.wav": "assets/sfx/se_kan.webm",
+  "assets/sfx/se_kan_door.wav": "assets/sfx/se_kan_door.webm",
+  "assets/sfx/se_kan_far.wav": "assets/sfx/se_kan_far.webm",
+  "assets/sfx/se_knock.wav": "assets/sfx/se_knock.webm",
+  "assets/sfx/se_laugh_mother.wav": "assets/sfx/se_laugh_mother.webm",
+  "assets/sfx/se_laugh_woman.wav": "assets/sfx/se_laugh_woman.webm",
+  "assets/sfx/se_pant.wav": "assets/sfx/se_pant.webm",
+  "assets/sfx/se_pick.wav": "assets/sfx/se_pick.webm",
+  "assets/sfx/se_ring.wav": "assets/sfx/se_ring.webm",
+  "assets/sfx/se_run.wav": "assets/sfx/se_run.webm",
+  "assets/sfx/se_stairs.wav": "assets/sfx/se_stairs.webm",
+  "assets/sfx/se_switch.wav": "assets/sfx/se_switch.webm",
+  "assets/sfx/ui_choice.wav": "assets/sfx/ui_choice.webm",
+  "assets/sfx/ui_cursor.wav": "assets/sfx/ui_cursor.webm",
+  "assets/sfx/ui_open.wav": "assets/sfx/ui_open.webm",
+  "assets/sfx/ui_page.wav": "assets/sfx/ui_page.webm",
+  "assets/sfx/ui_save.wav": "assets/sfx/ui_save.webm",
+  "font-atlas/default.fontatlas": "font-atlas/default.fontatlas.gz"
+ }
+}

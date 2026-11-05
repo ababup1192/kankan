@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "note": "クレジットに流す行（上から順）。style は heading（見出し）/ body（本文）/ small（出典の URL など）/ gap（空き）。写真と録音（CC BY は作者と許諾を出すのが条件）とフォント（SIL OFL）の表記は CREDITS.md と同じ物を置く。",
+  "rows": [
+    {
+      "text": "カン、カン",
+      "style": "heading"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    },
+    {
+      "text": "原作",
+      "style": "heading"
+    },
+    {
+      "text": "2ちゃんねる オカルト板への投稿（2002 年）",
+      "style": "body"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    },
+    {
+      "text": "字",
+      "style": "heading"
+    },
+    {
+      "text": "New Tegomin（SIL Open Font License 1.1）",
+      "style": "body"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    },
+    {
+      "text": "音",
+      "style": "heading"
+    },
+    {
+      "text": "録音は Freesound（CC0）と Wikimedia Commons（CC0・パブリックドメイン）より。切り出して加工しています",
+      "style": "small"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    },
+    {
+      "text": "kkenny101・gerainsan・szegvari・manuke",
+      "style": "body"
+    },
+    {
+      "text": "SamuelGremaud・se2001・Cloud-10・qubodup・NachtmahrTV",
+      "style": "body"
+    },
+    {
+      "text": "TRP・LanDub・Philip_Berger・Flem0527・tgerginov・IENBA・tbsounddesigns・Autobot8299・MelvinJaepel・susychristiansen",
+      "style": "body"
+    },
+    {
+      "text": "Coins dropped in metallic moneybox・DTMF dialing・JA dial tone",
+      "style": "small"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    },
+    {
+      "text": "作り",
+      "style": "heading"
+    },
+    {
+      "text": "flix_game_engine",
+      "style": "body"
+    },
+    {
+      "text": "",
+      "style": "gap"
+    }
+  ]
+}
