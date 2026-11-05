@@ -143,7 +143,16 @@ title: Woman
 <<clear>>
 <<wait 0.7>>
 <<ambience heart>>
+<<text top normal left>>
 私は恐ろしさのあまり足をガクガク震わせていました。
+-> 息を殺す
+    <<wait 0.4>>
+-> 姉の手を掴む
+    <<clear>>
+    <<text bottom normal left>>
+    姉の手は冷たく、握り返してはきませんでした。
+<<clear>>
+<<wait 0.7>>
 <<text mid large center>>
 <<speed 0.49>>
 声を出してはいけない
@@ -356,6 +365,11 @@ title: Wall
 <<clear>>
 <<text bottom normal left>>
 <<speed 0.77>>
+-> 扉を開ける
+    <<wait 0.4>>
+-> 布団をかぶる
+    それでも音は止みませんでした。
+    <<clear>>
 私はついに、その音がどこで鳴っているのか分かってしまいました。
 <<wait 1.0>>
 <<jump Corridor>>
@@ -679,7 +693,11 @@ title: Call
 私の手は再び震え始めました。手だけじゃない。足もガクガク震え出して、立っているのがやっとだった。
 あまりにもおかしいです。いくら冷静さを失っていた私でも、この異常には気付きました。
 <<clear>>
-<<wait 0.7>>
+-> 受話器を握り直す
+    <<wait 0.4>>
+-> 耳から離す
+    受話器の向こうで、かすかに金属の音がした気がしました。
+    <<clear>>
 「なんで・・・お母さ・・・」
 <<text mid normal left>>
 『え？なんでって何が・・・ちょっと、大丈夫？本当にどうしたの？』
