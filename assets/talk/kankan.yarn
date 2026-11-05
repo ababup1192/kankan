@@ -747,5 +747,11 @@ title: Call
 <<hold 6>>
 次の日、姉と一緒に戻りました。
 <<clear>>
+<<wait 2.5>>
+<<text mid large center>>
+<<speed 0.25>>
+<<hold 5>>
+続く...
+<<clear>>
 <<wait 4.0>>
 ===

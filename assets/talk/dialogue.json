@@ -4861,6 +4861,50 @@
           "line": 750,
           "name": "wait",
           "args": [
+            "2.5"
+          ]
+        },
+        {
+          "kind": "command",
+          "line": 751,
+          "name": "text",
+          "args": [
+            "mid",
+            "large",
+            "center"
+          ]
+        },
+        {
+          "kind": "command",
+          "line": 752,
+          "name": "speed",
+          "args": [
+            "0.25"
+          ]
+        },
+        {
+          "kind": "command",
+          "line": 753,
+          "name": "hold",
+          "args": [
+            "5"
+          ]
+        },
+        {
+          "kind": "line",
+          "line": 754,
+          "text": "続く..."
+        },
+        {
+          "kind": "command",
+          "line": 755,
+          "name": "clear"
+        },
+        {
+          "kind": "command",
+          "line": 756,
+          "name": "wait",
+          "args": [
             "4.0"
           ]
         }
