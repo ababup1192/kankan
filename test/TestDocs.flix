@@ -1,0 +1,94 @@
+// JSON とコードの橋渡しだけをテストする: コードが名前で引く物（写真・音・言葉の鍵・語彙）が Doc と素材の側に揃っているか。
+mod TestDocs {
+
+    use fge::{DocJson, JsonCodec, ProjectLoader, Yarn}
+
+    /// project.json の配列 key の各要素の name。
+    def namesIn(key: String): Set[String] \ Fs.FileRead =
+        DocJson.readJson("project.json") |> Result.toOption |> Option.flatMap(JsonCodec.expectObject)
+            |> Option.flatMap(root -> Map.get(key, root))
+            |> Option.flatMap(JsonCodec.decodeList(j -> JsonCodec.expectObject(j) |> Option.map(obj -> JsonCodec.stringOr("name", "", obj))))
+            |> Option.getWithDefault(Nil) |> List.toSet
+
+    def commandArgs(name: String, program: Yarn.Program): List[String] =
+        def walk(body: List[Yarn.Statement]): List[Yarn.Command] = body |> List.flatMap(statement -> match statement {
+            case Yarn.Statement.Command(c)      => c :: Nil
+            case Yarn.Statement.Choose(cs)      => cs |> List.flatMap(choice -> walk(choice#body))
+            case Yarn.Statement.If(branches, _) => branches |> List.flatMap(b -> walk(b#body))
+            case _                              => Nil
+        });
+        Yarn.nodeNames(program) |> List.filterMap(n -> Yarn.nodeOf(n, program)) |> List.flatMap(node -> walk(node#body))
+            |> List.filter(c -> c#name == name) |> List.filterMap(c -> List.head(c#args))
+
+    @Test
+    def testProjectJsonLoads(): Unit \ {Assert, Fs.FileRead} =
+        // project.json は実機の起動と同じ読み手で読める（欠けた欄があるとウィンドウが開く前に止まる）。
+        let loaded = ProjectLoader.loadProject(".") |> Result.map(_ -> ());
+        Assert.assertEq(expected = Ok(()), loaded)
+
+    @Test
+    def testProjectJsonHasPortraitDesign(): Unit \ {Assert, Fs.FileRead} =
+        // project.json は縦の design の決め方（web.portraitDesign）を持つ（縦に持って開くと縦の画面で起動する）。
+        let spec = ProjectLoader.loadProject(".") |> Result.toOption |> Option.flatMap(p -> p#portraitDesign)
+            |> Option.map(s -> (s#width, s#minHeight));
+        Assert.assertEq(expected = Some((540, 960)), spec)
+
+    @Test
+    def testPortraitDocMatchesCodeDefaults(): Unit \ {Assert, Fs.FileRead} =
+        // novel.portrait.json は読めて、コードの既定値と同じ値から出発している。
+        let read = DocJson.readJson(PortraitDoc.path()) |> Result.toOption |> Option.map(_ -> PortraitDoc.rec(PortraitDoc.load(PortraitDoc.path())));
+        let d = PortraitDoc.rec(PortraitDoc.defaults());
+        let shape = (r: PortraitDoc.Rec) -> (r#bodySize, r#buttonHeight, r#choiceHeight, r#settingRowHeight, r#tabHeight, r#backHeight);
+        Assert.assertEq(expected = Some(shape(d)), read |> Option.map(shape))
+
+    @Test
+    def testEveryPhotoHasATexture(): Unit \ {Assert, Fs.FileRead} =
+        // novel.backdrops.json の写真は、どれも project.json の textures に名前がある（描き出しと実機が同じ名前で読む）。
+        let res = TestKit.res();
+        let textures = namesIn("textures");
+        let missing = BackdropDoc.rec(res#backdrops)#photos |> Map.valuesOf |> List.map(photo -> photo#texture)
+            |> List.filter(t -> not Set.memberOf(t, textures));
+        Assert.assertEq(expected = Nil, missing)
+
+    @Test
+    def testEverySoundTheGameCanPlayIsRegistered(): Unit \ {Assert, Fs.FileRead} =
+        // 返事の音・台本の <<se>> と <<ambience>>・タイトルの環境音は、どれも project.json の sounds にある。
+        let res = TestKit.res();
+        let sounds = namesIn("sounds");
+        let replies = World.Event.Paged :: World.Event.Revealed :: World.Event.Moved :: World.Event.Picked ::
+                      World.Event.Opened :: World.Event.Closed :: World.Event.Saved :: World.Event.Loaded :: World.Event.Rolled :: Nil;
+        let ses = commandArgs("se", res#dialogue) |> List.map(n -> World.Event.Cue("se_${n}"));
+        let played = List.append(replies, ses) |> List.filterMap(Controls.soundOf);
+        let ambiences = (StoryDoc.rec(res#story)#titleAmbience :: commandArgs("ambience", res#dialogue))
+            |> List.filter(n -> n != "off") |> List.map(n -> "amb_${n}");
+        let missing = List.append(played, ambiences) |> List.filter(n -> not Set.memberOf(n, sounds)) |> List.distinct;
+        Assert.assertEq(expected = Nil, missing)
+
+    @Test
+    def testStoryDocHasEveryLabel(): Unit \ {Assert, Fs.FileRead} =
+        // novel.story.json に、画面に出す言葉の鍵が全部ある（無ければ既定の言葉で出るが、Doc で直せない言葉が残る）。
+        let res = TestKit.res();
+        let missing = StoryDoc.labels() |> List.map(StoryDoc.labelKey)
+            |> List.filter(key -> not Map.memberOf(key, StoryDoc.rec(res#story)#labels));
+        Assert.assertEq(expected = Nil, missing)
+
+    @Test
+    def testEverySpeakerHasAName(): Unit \ {Assert, Fs.FileRead} =
+        // 話し手の id（Talk.Speaker）は、どれも novel.story.json の names に呼び名がある。
+        let res = TestKit.res();
+        let missing = Talk.speakers() |> List.map(Talk.speakerId)
+            |> List.filter(id -> not Map.memberOf(id, StoryDoc.rec(res#story)#names));
+        Assert.assertEq(expected = Nil, missing)
+
+    @Test
+    def testVocabFileMatchesTalk(): Unit \ {Assert, Fs.FileRead} =
+        // build の check が読む assets/talk/vocab.json は、コードの語彙（Talk.vocabOf）を書いた物と同じ（make talk-vocab で書き直す）。
+        let onDisk = Fs.FileRead.read(Talk.vocabPath()) |> Result.toOption |> Option.map(String.trim);
+        Assert.assertEq(expected = Some(String.trim(Yarn.vocabJson(Talk.vocabOf()))), onDisk)
+
+    @Test
+    def testOpeningNodeExists(): Unit \ {Assert, Fs.FileRead} =
+        // コードが開くノードが、build したシナリオにある。
+        let res = TestKit.res();
+        Assert.assertEq(expected = true, Option.nonEmpty(Yarn.nodeOf(Talk.nodeName(Talk.Node.Opening), res#dialogue)))
+}

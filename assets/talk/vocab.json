@@ -1,0 +1,6 @@
+{
+  "speakers": ["me"],
+  "nodes": ["Opening"],
+  "tags": {},
+  "commands": ["bg", "nvl", "adv", "clear", "ambience", "se", "fx", "shake", "dim", "flash", "zoom", "text", "speed"]
+}

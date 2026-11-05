@@ -1,0 +1,314 @@
+{
+  "version": 1,
+  "note": "背景の写真と時間帯の色。シナリオの <<bg 写真 時間帯 秒>> の名前はここの鍵。同じ写真を時間帯で明るくも暗くも使う（作り方は src/Backdrop.flix の冒頭）。texture = project.json の textures の名前、label = セーブ画面に出す場所の名前。blur = ぼかしの半径（画面の幅に対する割合）、taps = ぼかしで読む点の数、saturation = 彩度、exposure = 明るさ、tint = 赤・緑・青の倍率、lift = 暗い所に足す色、sky / skyStrength / skyReach = 上から差す光の色・強さ・届く深さ、vignette = 四隅を落とす強さ、focusPull = 切り替えの頭で余分にぼかす量。",
+  "photos": {
+    "alley": {
+      "texture": "bg_alley",
+      "label": "路地"
+    },
+    "bed": {
+      "texture": "bg_bed",
+      "label": "朝"
+    },
+    "bedroom": {
+      "texture": "bg_bedroom",
+      "label": "寝室"
+    },
+    "blue": {
+      "texture": "bg_blue",
+      "label": "居間"
+    },
+    "breakfast": {
+      "texture": "bg_breakfast",
+      "label": "朝"
+    },
+    "ceiling": {
+      "texture": "bg_ceiling",
+      "label": "寝室"
+    },
+    "corridor": {
+      "texture": "bg_corridor",
+      "label": "廊下"
+    },
+    "desk": {
+      "texture": "bg_desk",
+      "label": "自分の部屋"
+    },
+    "door": {
+      "texture": "bg_door",
+      "label": "自分の部屋"
+    },
+    "entry": {
+      "texture": "bg_entry",
+      "label": "玄関"
+    },
+    "face": {
+      "texture": "bg_face",
+      "label": "居間"
+    },
+    "hammer": {
+      "texture": "bg_hammer",
+      "label": "居間"
+    },
+    "kitchen": {
+      "texture": "bg_kitchen",
+      "label": "キッチン"
+    },
+    "living": {
+      "texture": "bg_living",
+      "label": "居間"
+    },
+    "livingphone": {
+      "texture": "bg_livingphone",
+      "label": "居間"
+    },
+    "payphone": {
+      "texture": "bg_payphone",
+      "label": "公衆電話"
+    },
+    "receiver": {
+      "texture": "bg_receiver",
+      "label": "公衆電話"
+    },
+    "sister": {
+      "texture": "bg_sister",
+      "label": "居間"
+    },
+    "sisterdown": {
+      "texture": "bg_sisterdown",
+      "label": "次の日"
+    },
+    "stairs": {
+      "texture": "bg_stairs",
+      "label": "階段"
+    },
+    "store": {
+      "texture": "bg_store",
+      "label": "スーパー"
+    },
+    "switch": {
+      "texture": "bg_switch",
+      "label": "洗面所"
+    },
+    "wall": {
+      "texture": "bg_wall",
+      "label": "自分の部屋"
+    },
+    "woman": {
+      "texture": "bg_woman",
+      "label": "居間"
+    }
+  },
+  "grades": {
+    "day": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.9,
+      "exposure": 1.0,
+      "tint": [
+        1,
+        1,
+        1
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.4,
+      "focusPull": 0.6
+    },
+    "dim": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.5,
+      "exposure": 0.55,
+      "tint": [
+        0.95,
+        0.95,
+        1.05
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.75,
+      "focusPull": 0.6
+    },
+    "lamp": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.7,
+      "exposure": 0.6,
+      "tint": [
+        1.12,
+        0.93,
+        0.76
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.8,
+      "focusPull": 0.6
+    },
+    "dusk": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.6,
+      "exposure": 0.6,
+      "tint": [
+        1.15,
+        0.86,
+        0.7
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.7,
+      "focusPull": 0.6
+    },
+    "night": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.25,
+      "exposure": 0.42,
+      "tint": [
+        0.72,
+        0.84,
+        1.25
+      ],
+      "lift": [
+        0,
+        0.004,
+        0.015
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.85,
+      "focusPull": 0.6
+    },
+    "moon": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.3,
+      "exposure": 0.52,
+      "tint": [
+        0.74,
+        0.87,
+        1.28
+      ],
+      "lift": [
+        0,
+        0.008,
+        0.025
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.8,
+      "focusPull": 0.6
+    },
+    "pitch": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.12,
+      "exposure": 0.1,
+      "tint": [
+        0.8,
+        0.85,
+        1.1
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.9,
+      "focusPull": 0.6
+    },
+    "morning": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.85,
+      "exposure": 1.08,
+      "tint": [
+        1,
+        1.02,
+        1.05
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.28,
+      "focusPull": 0.6
+    },
+    "store": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.85,
+      "exposure": 1.0,
+      "tint": [
+        1,
+        1,
+        1
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.3,
+      "focusPull": 0.6
+    },
+    "phone": {
+      "blur": 0.0012,
+      "taps": 8,
+      "saturation": 0.8,
+      "exposure": 0.8,
+      "tint": [
+        1,
+        1,
+        1
+      ],
+      "lift": [
+        0,
+        0,
+        0
+      ],
+      "sky": "#000000",
+      "skyStrength": 0.0,
+      "skyReach": 0.5,
+      "vignette": 0.6,
+      "focusPull": 0.6
+    }
+  }
+}

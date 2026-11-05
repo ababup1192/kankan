@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "title": "カン、カン",
+  "designWidth": 540,
+  "designHeight": 960,
+  "windowWidth": 540,
+  "windowHeight": 960,
+  "clearColor": {
+    "r": 0.0,
+    "g": 0.0,
+    "b": 0.0
+  },
+  "maxDeltaTime": 0.05,
+  "// textures": "背景の写真（出典は CREDITS.md）。名前は assets/novel.backdrops.json の photos の texture と対。",
+  "textures": [
+    {
+      "name": "bg_alley",
+      "path": "assets/bg/alley.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_bed",
+      "path": "assets/bg/bed.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_bedroom",
+      "path": "assets/bg/bedroom.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_blue",
+      "path": "assets/bg/blue.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_breakfast",
+      "path": "assets/bg/breakfast.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_ceiling",
+      "path": "assets/bg/ceiling.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_corridor",
+      "path": "assets/bg/corridor.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_desk",
+      "path": "assets/bg/desk.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_door",
+      "path": "assets/bg/door.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_entry",
+      "path": "assets/bg/entry.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_face",
+      "path": "assets/bg/face.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_hammer",
+      "path": "assets/bg/hammer.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_kitchen",
+      "path": "assets/bg/kitchen.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_living",
+      "path": "assets/bg/living.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_livingphone",
+      "path": "assets/bg/livingphone.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_payphone",
+      "path": "assets/bg/payphone.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_receiver",
+      "path": "assets/bg/receiver.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_sister",
+      "path": "assets/bg/sister.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_sisterdown",
+      "path": "assets/bg/sisterdown.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_stairs",
+      "path": "assets/bg/stairs.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_store",
+      "path": "assets/bg/store.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_switch",
+      "path": "assets/bg/switch.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_wall",
+      "path": "assets/bg/wall.jpg",
+      "hasAlpha": false
+    },
+    {
+      "name": "bg_woman",
+      "path": "assets/bg/woman.jpg",
+      "hasAlpha": false
+    }
+  ],
+  "// glyphs": "起動時に焼く字。used = ソースとアセットにある字を先に焼く（シナリオの字がそろってからタイトル画面が出る）",
+  "glyphs": "used",
+  "fonts": [
+    {
+      "name": "default",
+      "path": "assets/NewTegomin-Regular.ttf",
+      "fontSize": 40.0
+    }
+  ],
+  "sounds": [
+    {
+      "name": "amb_room",
+      "path": "assets/sfx/amb_room.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_drone",
+      "path": "assets/sfx/amb_drone.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_tension",
+      "path": "assets/sfx/amb_tension.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_title",
+      "path": "assets/sfx/amb_title.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_clock",
+      "path": "assets/sfx/amb_clock.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_morning",
+      "path": "assets/sfx/amb_morning.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_evening",
+      "path": "assets/sfx/amb_evening.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_store",
+      "path": "assets/sfx/amb_store.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_heart",
+      "path": "assets/sfx/amb_heart.wav",
+      "looping": true
+    },
+    {
+      "name": "amb_line",
+      "path": "assets/sfx/amb_line.wav",
+      "looping": true
+    },
+    {
+      "name": "se_kan",
+      "path": "assets/sfx/se_kan.wav",
+      "looping": false
+    },
+    {
+      "name": "se_kan_door",
+      "path": "assets/sfx/se_kan_door.wav",
+      "looping": false
+    },
+    {
+      "name": "se_kan_far",
+      "path": "assets/sfx/se_kan_far.wav",
+      "looping": false
+    },
+    {
+      "name": "se_ring",
+      "path": "assets/sfx/se_ring.wav",
+      "looping": false
+    },
+    {
+      "name": "se_pick",
+      "path": "assets/sfx/se_pick.wav",
+      "looping": false
+    },
+    {
+      "name": "se_hang",
+      "path": "assets/sfx/se_hang.wav",
+      "looping": false
+    },
+    {
+      "name": "se_coin",
+      "path": "assets/sfx/se_coin.wav",
+      "looping": false
+    },
+    {
+      "name": "se_busy",
+      "path": "assets/sfx/se_busy.wav",
+      "looping": false
+    },
+    {
+      "name": "se_switch",
+      "path": "assets/sfx/se_switch.wav",
+      "looping": false
+    },
+    {
+      "name": "se_knock",
+      "path": "assets/sfx/se_knock.wav",
+      "looping": false
+    },
+    {
+      "name": "se_dial",
+      "path": "assets/sfx/se_dial.wav",
+      "looping": false
+    },
+    {
+      "name": "se_hit",
+      "path": "assets/sfx/se_hit.wav",
+      "looping": false
+    },
+    {
+      "name": "se_door",
+      "path": "assets/sfx/se_door.wav",
+      "looping": false
+    },
+    {
+      "name": "se_stairs",
+      "path": "assets/sfx/se_stairs.wav",
+      "looping": false
+    },
+    {
+      "name": "ui_page",
+      "path": "assets/sfx/ui_page.wav",
+      "looping": false
+    },
+    {
+      "name": "ui_cursor",
+      "path": "assets/sfx/ui_cursor.wav",
+      "looping": false
+    },
+    {
+      "name": "ui_choice",
+      "path": "assets/sfx/ui_choice.wav",
+      "looping": false
+    },
+    {
+      "name": "ui_open",
+      "path": "assets/sfx/ui_open.wav",
+      "looping": false
+    },
+    {
+      "name": "ui_save",
+      "path": "assets/sfx/ui_save.wav",
+      "looping": false
+    }
+  ],
+  "editor": {
+    "resources": [
+      {
+        "id": "story",
+        "pattern": "assets/novel.story.json",
+        "title": "画面の言葉（タイトル画面・ボタン・セーブ）と話し手の呼び名",
+        "role": "material",
+        "schema": "assets/story.schema.json"
+      },
+      {
+        "id": "backdrops",
+        "pattern": "assets/novel.backdrops.json",
+        "title": "背景の写真と時間帯の色（ぼかし・夕暮れ・夜・朝）",
+        "role": "material",
+        "schema": "assets/backdrops.schema.json"
+      },
+      {
+        "id": "theme",
+        "pattern": "assets/novel.theme.json",
+        "title": "字と窓の色",
+        "role": "material",
+        "schema": "assets/theme.schema.json"
+      },
+      {
+        "id": "credits",
+        "pattern": "assets/novel.credits.json",
+        "title": "クレジット（写真とフォントの出典）",
+        "role": "material",
+        "schema": "assets/credits.schema.json"
+      },
+      {
+        "id": "kind",
+        "pattern": "assets/novel.kind.json",
+        "title": "手触り（字の大きさ・オート・スキップ・揺れ・蛍）",
+        "role": "tuning",
+        "schema": "assets/kind.schema.json"
+      },
+      {
+        "id": "keys",
+        "pattern": "assets/novel.keys.json",
+        "title": "操作（キーの割り当て）",
+        "role": "tuning",
+        "schema": "assets/keys.schema.json"
+      },
+      {
+        "id": "small",
+        "pattern": "assets/novel.small.json",
+        "title": "小さい画面の字とボタンの大きさ",
+        "role": "tuning",
+        "schema": "assets/small.schema.json"
+      },
+      {
+        "id": "portrait",
+        "pattern": "assets/novel.portrait.json",
+        "title": "縦の画面の字とボタンの大きさ",
+        "role": "tuning",
+        "schema": "assets/portrait.schema.json"
+      },
+      {
+        "id": "mixer",
+        "pattern": "assets/novel.mixer.json",
+        "title": "音の通り道（環境音と効果音のバス）",
+        "role": "tuning"
+      },
+      {
+        "id": "project",
+        "pattern": "project.json",
+        "schema": "project.schema.json",
+        "title": "ゲームの題・画面",
+        "role": "tuning"
+      }
+    ]
+  },
+  "web": {
+    "keysDoc": "assets/novel.keys.json",
+    "touchGestures": {
+      "longPress": "back",
+      "swipeLeft": "rollback"
+    },
+    "orientation": "portrait",
+    "portraitDesign": {
+      "width": 540,
+      "minHeight": 960
+    }
+  }
+}
