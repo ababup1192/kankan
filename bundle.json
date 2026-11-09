@@ -266,7 +266,9 @@
  },
  "touchGestures": {
   "longPress": "KeyX",
-  "swipeLeft": "PageUp"
+  "swipeDown": "PageDown",
+  "swipeLeft": "PageUp",
+  "swipeUp": "PageDown"
  },
  "orientation": "portrait",
  "transcoded": {
