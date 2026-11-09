@@ -125,13 +125,27 @@ mod Controls {
     def railInput(res: Res.Res, frame: App.Frame, fit: Layout.Fit, releasedText: Bool, w0: World.World): World.World \ Emit[World.Event] =
         let buttons = WorldMenu.buttonsOf(fit);
         let onRail = Layout.hitOf(List.length(buttons), i -> Layout.button(fit, i, List.length(buttons)), frame#cursor);
-        let onMore = frame#mouseClicked and Layout.contains(Layout.moreButton(fit)#hit, frame#cursor);
+        let overMore = Layout.contains(Layout.moreButton(fit)#hit, frame#cursor);
+        let onMore = frame#mouseClicked and overMore;
+        let touchLong = not frame#mouseDown and not frame#mouseClicked and tapped(keysOf(res)#back, frame);
         let w = dropGesture(w0);
         match (w#grab, onRail) {
             case (World.Grab.Hold(i, held), _) =>
                 List.nth(i, buttons) |> Option.map(b -> holdButton(res, frame, b, i, held, w)) |> Option.getWithDefault({ grab = World.Grab.Free | w })
             case (_, Some(i)) if frame#mouseClicked => { grab = World.Grab.Hold(i, 0.0) | w }
+            case (_, Some(i)) if touchLong => List.nth(i, buttons) |> Option.map(b -> touchLongPress(res, frame, b, i, w)) |> Option.getWithDefault(w)
+            // WhyNot: … の上の指の長押しで隠すにしない — … を押そうとした指で、文章のウィンドウが消える。
+            case _ if touchLong and overMore => w
             case _ => readingRest(res, frame, if (onMore) Some(World.Button.Menu) else None, releasedText, w0)
+        }
+
+    /// ブラウザ版の指の長押し（離した時に touchGestures の longPress = 戻るのキーが、押した所のまま届く）が右の列の上だった:
+    /// マウスの長押しと同じく、オートはスキップ、ほかは名前のツールチップ（離した後に出す）。
+    // WhyNot: 戻るのキーのまま隠すにしない — ブラウザの指は置いている間に押しを出さないので、列の長押しが全部ウィンドウを隠すになる。
+    def touchLongPress(res: Res.Res, frame: App.Frame, button: World.Button, i: Int32, w: World.World): World.World \ Emit[World.Event] =
+        match WorldMenu.longPressOf(button) {
+            case WorldMenu.LongPress.Press(other) => WorldMenu.press(res, other, w)
+            case WorldMenu.LongPress.Tooltip      => { tip = Some((i, frame#realNow)) | w }
         }
 
     /// 押し続けている列のボタン: 長押しの秒に届く前に離したら押したことにする。届いたら WorldMenu.longPressOf のとおり、

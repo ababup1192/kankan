@@ -194,6 +194,34 @@ mod TestGesture {
         let w = play(res, down(0.0, p) :: holdFrames(res, 0.0, p), begun(res));
         Assert.assertEq(expected = World.Playback.Skip, World.playbackOf(w))
 
+    /// ブラウザ版の指の長押しを離したフレーム（押しは出さず、touchGestures の longPress = 戻るのキーが押した所のまま届く）。
+    def touchLongRelease(res: Res.Res, at: Float64, p: { x = Float64, y = Float64 }): App.Frame =
+        let back = KeysDoc.rec(res#keys)#back |> List.head |> Option.getWithDefault(Key.Escape);
+        { justPressed = Set#{back}, down = Set#{back} | up(at, p) }
+
+    @Test
+    def testTouchLongPressOnLogShowsItsNameWithoutHiding(): Unit \ {Assert, Fs.FileRead} =
+        // 指でログを長押しして離すと、ウィンドウは隠さず、ログも開かず、名前のツールチップを出す。
+        let res = TestKit.res();
+        let start = begun(res);
+        let w = play(res, touchLongRelease(res, 1.0, buttonCenter(res, World.Button.Log)) :: Nil, start);
+        let logAt = WorldMenu.buttonsOf(portrait(res)) |> List.zipWithIndex |> List.find(match (_, b) -> b == World.Button.Log) |> Option.map(fst);
+        Assert.assertEq(expected = ("Closed", logAt), (World.panelName(w), w#tip |> Option.map(fst)))
+
+    @Test
+    def testTouchLongPressOnAutoStartsSkip(): Unit \ {Assert, Fs.FileRead} =
+        // 指でオートを長押しして離すとスキップになる（ウィンドウは隠さない）。
+        let res = TestKit.res();
+        let w = play(res, touchLongRelease(res, 1.0, buttonCenter(res, World.Button.Auto)) :: Nil, begun(res));
+        Assert.assertEq(expected = (World.Playback.Skip, "Closed"), (World.playbackOf(w), World.panelName(w)))
+
+    @Test
+    def testTouchLongPressOnTextHidesTheWindow(): Unit \ {Assert, Fs.FileRead} =
+        // 本文の上の指の長押しは今まで通りウィンドウを隠す。
+        let res = TestKit.res();
+        let w = play(res, touchLongRelease(res, 1.0, spot()) :: Nil, begun(res));
+        Assert.assertEq(expected = "Hidden", World.panelName(w))
+
     // ══ 右上の … としおり ══
 
     @Test

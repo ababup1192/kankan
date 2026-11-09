@@ -213,7 +213,8 @@ mod World {
 
     /// ゲームの状態（遊びの状態だけ。Doc とシナリオは Res が持つ）。scene / panel / ask = 冒頭の「状態の形」、
     /// saves = セーブデータ・既読・設定、saveRev = saves を変えた回数（Saves を書く出力の鍵）、pointer = マウスの位置（触れている物を明るくする）、
-    /// clockBase = 起動した時のその土地の時刻（秒。セーブの日時の元）、toast = 知らせの言葉と出した実時間、quitting = 終了を決めた、
+    /// clockBase = 起動した時のその土地の時刻（秒。セーブの日時の元）、toast = 知らせの言葉と出した実時間、
+    /// tip = 指の長押しで名前を出した右の列のボタンの番号と出した実時間（ブラウザ版の指は離した時にしか長押しと分からないので、離した後に出す）、quitting = 終了を決めた、
     /// events = 規則が出した出来事（音の材料）、gesture = 読む画面で押し始めた 1 回の押し（離した時にタップか払いかを決める）。
     /// 押している間の掴み。Free = 押していない、Slider(i) = 設定の画面で押し始めた所が i 行目のスライダーの帯、Other = それ以外を押している、
     /// Hold(i, 秒) = 縦の画面で読む間に右の列の i 番目のボタンを押し続けている秒（長押しで名前のツールチップ・オートはスキップ）。
@@ -238,6 +239,7 @@ mod World {
         storyClock = Clock.Clock[Stage.Story],
         realNow = Clock.Time[Clock.Real],
         toast = Option[(StoryDoc.Label, Clock.Time[Clock.Real])],
+        tip = Option[(Int32, Clock.Time[Clock.Real])],
         quitting = Bool,
         events = Emit.Events[Event]
     }
@@ -247,7 +249,7 @@ mod World {
     pub def initial(saves: Saves.Saves, clockBase: Int64): World =
         { scene = Scene.Title(TitleItem.NewGame), panel = Panel.Closed, ask = None,
           saves = saves, saveRev = 0, pointer = { x = -1.0, y = -1.0 }, grab = Grab.Free, gesture = Gesture.idle(), clockBase = clockBase,
-          storyClock = Clock.start(), realNow = Clock.zero(), toast = None, quitting = false, events = Emit.empty() }
+          storyClock = Clock.start(), realNow = Clock.zero(), toast = None, tip = None, quitting = false, events = Emit.empty() }
 
     /// 読み始める前の Read（舞台・頁・バックログが空）。
     pub def emptyRead(): Read =

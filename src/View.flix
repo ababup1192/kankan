@@ -31,13 +31,14 @@ mod View {
         saves = Saves.Saves,
         pointer = { x = Float64, y = Float64 },
         grab = World.Grab,
+        tip = Option[(Int32, Clock.Time[Clock.Real])],
         realNow = Clock.Time[Clock.Real],
         storyNow = Clock.Time[Stage.Story],
         fit = Layout.Fit
     }
 
     pub def envOf(fit: Layout.Fit, res: Res.Res, w: World.World): Env =
-        { res = res, saves = w#saves, pointer = w#pointer, grab = w#grab, realNow = w#realNow, storyNow = World.now(w), fit = fit }
+        { res = res, saves = w#saves, pointer = w#pointer, grab = w#grab, tip = w#tip, realNow = w#realNow, storyNow = World.now(w), fit = fit }
 
     /// 描く画面の区分と design の向き・大きさから並べ方の組を選ぶ（Controls が Frame から引く組と同じ）。
     // WhyNot: ctx#visible#size を design の大きさとして読んでよいのは、このゲームが camera を使わないから（HUD は常に design 全体）。
@@ -442,16 +443,19 @@ mod View {
         :: (List.range(-1, 2) |> List.map(k -> RawDraw.circleAt({ x = center#x + Int32.toFloat64(k) * gap, y = center#y }, dot, t#ink, zButtons())))
 
     /// 長押しのツールチップ: 押し続けているボタンの左に、暗い札と右向きの小さな三角で名前を出す（長押しの秒に届いてから）。
+    /// 指の長押し（tip）は離した後に知らせと同じ秒だけ出す。
     def tooltip(atlas: FontAtlas, env: Env): List[Render.PlacedItem] =
         let all = WorldMenu.buttonsOf(env#fit);
         let long = PortraitDoc.rec(env#res#portrait)#holdSeconds;
-        match env#grab {
-            case World.Grab.Hold(i, held) if held >= long =>
-                List.nth(i, all) |> Option.filter(b -> WorldMenu.longPressOf(b) == WorldMenu.LongPress.Tooltip)
-                    |> Option.map(b -> tooltipPlate(atlas, env, Layout.tooltipAnchor(env#fit, i), label(buttonLabel(b), env)))
-                    |> Option.getWithDefault(Nil)
-            case _ => Nil
-        }
+        let tipped = env#tip |> Option.filter(match (_, at) -> Clock.since(at, env#realNow) < kindOf(env)#toastSeconds) |> Option.map(fst);
+        let pressed = match env#grab {
+            case World.Grab.Hold(i, held) if held >= long => Some(i)
+            case _                                        => tipped
+        };
+        pressed |> Option.flatMap(i -> List.nth(i, all) |> Option.map(b -> (i, b)))
+            |> Option.filter(match (_, b) -> WorldMenu.longPressOf(b) == WorldMenu.LongPress.Tooltip)
+            |> Option.map(match (i, b) -> tooltipPlate(atlas, env, Layout.tooltipAnchor(env#fit, i), label(buttonLabel(b), env)))
+            |> Option.getWithDefault(Nil)
 
     def tooltipPlate(atlas: FontAtlas, env: Env, anchor: Vec2.Vec2, word: String): List[Render.PlacedItem] =
         let t = theme(env);
