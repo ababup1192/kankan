@@ -4,11 +4,13 @@
  "files": [
   "assets/OFL.txt",
   "assets/novel.backdrops.json",
+  "assets/novel.cast.json",
   "assets/novel.credits.json",
   "assets/novel.keys.json",
   "assets/novel.kind.json",
   "assets/novel.mixer.json",
   "assets/novel.portrait.json",
+  "assets/novel.rail.json",
   "assets/novel.small.json",
   "assets/novel.story.json",
   "assets/novel.theme.json",
@@ -40,7 +42,8 @@
   "assets/bg/store.jpg",
   "assets/bg/switch.jpg",
   "assets/bg/wall.jpg",
-  "assets/bg/woman.jpg"
+  "assets/bg/woman.jpg",
+  "assets/cast/_sample_plain.png"
  ],
  "sounds": [
   {
@@ -265,7 +268,7 @@
   "h": 960
  },
  "touchGestures": {
-  "longPress": "KeyX",
+  "longPress": "ContextMenu",
   "swipeDown": "PageDown",
   "swipeLeft": "PageUp",
   "swipeUp": "PageDown"
@@ -296,6 +299,7 @@
   "assets/bg/switch.jpg": "assets/bg/switch.webp",
   "assets/bg/wall.jpg": "assets/bg/wall.webp",
   "assets/bg/woman.jpg": "assets/bg/woman.webp",
+  "assets/cast/_sample_plain.png": "assets/cast/_sample_plain.webp",
   "assets/sfx/amb_clock.wav": "assets/sfx/amb_clock.webm",
   "assets/sfx/amb_drone.wav": "assets/sfx/amb_drone.webm",
   "assets/sfx/amb_evening.wav": "assets/sfx/amb_evening.webm",
