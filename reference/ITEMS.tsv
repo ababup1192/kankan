@@ -18,7 +18,7 @@ portrait-settings	dynamic=166	static=0
 portrait-short-nvl	dynamic=147	static=0
 portrait-short-save	dynamic=598	static=0
 portrait-short-settings	dynamic=141	static=0
-portrait-title	dynamic=35	static=0
+portrait-title	dynamic=51	static=0
 portrait-woman	dynamic=167	static=0
 save	dynamic=687	static=0
 settings	dynamic=166	static=0
@@ -26,6 +26,6 @@ small-ask	dynamic=205	static=0
 small-nvl	dynamic=189	static=0
 small-save	dynamic=687	static=0
 small-settings	dynamic=166	static=0
-small-title	dynamic=35	static=0
-title	dynamic=35	static=0
+small-title	dynamic=51	static=0
+title	dynamic=51	static=0
 woman	dynamic=153	static=0
