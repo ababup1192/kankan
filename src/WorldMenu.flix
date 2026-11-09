@@ -69,33 +69,37 @@ mod WorldMenu {
         World.Button.ToTitle :: Nil
 
     /// 並べ方の組で出すボタン（View が描く列と Controls が当てる列は同じこの並び）。
-    /// 縦の画面は右端の縦の列に字の無いアイコンの 3 つ（上から しおり・ログ・オート）。右上の … は列の外（Layout.moreButton）。
-    /// セーブとロードはしおり（bookmarkItems）、スキップはオートの長押し、設定・タイトル・隠すは …（menuItems）から、
-    /// 戻る（Rollback）は払う（swipeLeft）とキーで届く。
+    /// 縦の画面は右端の縦の列に字の無いアイコンの 3 つ（上から しおり・ログ・オート）。右上の … は列の外（Rail.moreButton）。
+    /// セーブとロードはしおり（saveLoadItems）、スキップはオートの長押し、設定・タイトル・隠すは …（menuItems）から、
+    /// 戻る（Rollback）は払う（swipeLeft）とキー、隠すは指の長押し（touchHold）とキーでも届く。
     // WhyNot: 縦で 11 個を並べない — 540 の幅に 44 CSS px で並べると 1 つが 32 CSS px を割り、字のボタンが並ぶと頁の静けさが崩れる。
     pub def buttonsOf(fit: Layout.Fit): List[World.Button] =
-        if (Layout.isPortrait(fit)) World.Button.Bookmark :: World.Button.Log :: World.Button.Auto :: Nil
+        if (Layout.isPortrait(fit)) World.Button.SaveLoad :: World.Button.Log :: World.Button.Auto :: Nil
         else buttons()
+
+    /// 並べ方の組で出すボタンの中の button の番号（出していなければ None）。
+    pub def buttonIndexOf(fit: Layout.Fit, button: World.Button): Option[Int32] =
+        buttonsOf(fit) |> List.zipWithIndex |> List.find(match (_, b) -> b == button) |> Option.map(fst)
 
     /// 縦の画面の右上の … から開くメニューの項目（上から）。
     pub def menuItems(): List[World.Button] =
         World.Button.Settings :: World.Button.ToTitle :: World.Button.Hide :: Nil
 
-    /// しおりのボタンから開くメニューの項目（左から）。
-    pub def bookmarkItems(): List[World.Button] = World.Button.Save :: World.Button.Load :: Nil
+    /// しおりのボタンから開く選びの項目（左から）。
+    pub def saveLoadItems(): List[World.Button] = World.Button.Save :: World.Button.Load :: Nil
 
     /// 縦の画面の右の列のボタンを長押しした時に起きる事。Tooltip = 名前のツールチップを出す（離しても押さない）、
     /// Press(ボタン) = そのボタンを押したのと同じ。
-    pub enum LongPress with Eq, ToString {
+    pub enum LongPressAction with Eq, ToString {
         case Tooltip
         case Press(World.Button)
     }
 
     /// 右の列のボタンの長押し。オートはスキップに入る。
     // WhyNot: オートの長押しでツールチップを出さない — 列にスキップは無く、オートの長押しがスキップの入口なので、名前を待たずにスキップへ入る。
-    pub def longPressOf(button: World.Button): LongPress = match button {
-        case World.Button.Auto => LongPress.Press(World.Button.Skip)
-        case _                 => LongPress.Tooltip
+    pub def longPressOf(button: World.Button): LongPressAction = match button {
+        case World.Button.Auto => LongPressAction.Press(World.Button.Skip)
+        case _                 => LongPressAction.Tooltip
     }
 
     /// 右の列のボタンを短く押して離した。スキップ中のオートはスキップを止める。
@@ -104,15 +108,15 @@ mod WorldMenu {
         if (button == World.Button.Auto and World.playbackOf(w) == World.Playback.Skip) press(res, World.Button.Skip, w)
         else press(res, button, w)
 
-    /// しおりのメニューの項目を選ぶ: メニューを閉じてから、セーブ・ロードの画面を開く。[遷移: Bookmark→SaveSlots / LoadSlots]
-    pub def chooseBookmark(res: Res.Res, item: World.Button, w: World.World): World.World \ Emit[World.Event] =
+    /// しおりの選びの項目を選ぶ: 選びを閉じてから、セーブ・ロードの画面を開く。[遷移: SaveLoadPick→SaveSlots / LoadSlots]
+    pub def chooseSaveLoad(res: Res.Res, item: World.Button, w: World.World): World.World \ Emit[World.Event] =
         press(res, item, { panel = World.Panel.Closed | w })
 
-    /// しおりのメニューのカーソルを i へ（端で止まる）。
-    pub def pointBookmark(i: Int32, w: World.World): World.World \ Emit[World.Event] = match w#panel {
-        case World.Panel.Bookmark(at) =>
-            let next = Int32.max(0, Int32.min(List.length(bookmarkItems()) - 1, i));
-            if (next == at) w else { Emit.emit(World.Event.Moved); { panel = World.Panel.Bookmark(next) | w } }
+    /// しおりの選びのカーソルを i へ（端で止まる）。
+    pub def pointSaveLoad(i: Int32, w: World.World): World.World \ Emit[World.Event] = match w#panel {
+        case World.Panel.SaveLoadPick(at) =>
+            let next = Int32.max(0, Int32.min(List.length(saveLoadItems()) - 1, i));
+            if (next == at) w else { Emit.emit(World.Event.Moved); { panel = World.Panel.SaveLoadPick(next) | w } }
         case _ => w
     }
 
@@ -151,8 +155,8 @@ mod WorldMenu {
             case World.Button.Settings  => WorldSettings.openSettings(w)
             case World.Button.Hide      => World.mapRead(r -> { playback = World.Playback.Manual | r }, { panel = World.Panel.Hidden | w })
             case World.Button.ToTitle   => World.askFor(World.Ask.ToTitle, w)
-            case World.Button.Menu      => Emit.emit(World.Event.Opened); { panel = World.Panel.Menu(0) | w }
-            case World.Button.Bookmark  => Emit.emit(World.Event.Opened); { panel = World.Panel.Bookmark(0) | w }
+            case World.Button.Menu      => World.openPopup(World.Panel.Menu(0), w)
+            case World.Button.SaveLoad  => World.openPopup(World.Panel.SaveLoadPick(0), w)
         }
 
     // ── 確認のウィンドウ ──

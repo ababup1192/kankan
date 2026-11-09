@@ -14,6 +14,9 @@
 //   <<text 位置 大きさ 揃え>> 字の置き場 top / mid / bottom・大きさ small / normal / large / huge・揃え left / center
 //   <<speed 倍率>>            字の出る速さの倍率
 //   <<hold 秒>>               秒の間、タップで字を飛ばせなくする
+//   <<char 名前 [表情] [位置] [秒]>>  立ち絵を出す・表情や位置を替える（語の順は問わない。省いた語は出ている形のまま・出ていなければ CastDoc の既定）
+//   <<char 名前 off [秒]>> / <<char off [秒]>>   その人を消す / 全員消す
+//   <<item 名前 [位置] [秒]>> / <<item off [秒]>>  小物を出す（前の小物と入れ替わる）/ 消す（読み方と重ね方は Cast）
 //
 // 引数の読めないコマンドは Err で返し、World が 1 行知らせて舞台はそのまま続ける（シナリオの書き損じで止めない）。
 // セーブから戻る時は YarnRunner.resume が通ったコマンドを全部返すので、同じ applyCue で反映してから settle で
@@ -81,12 +84,14 @@ mod Stage {
         case Text(TextStyle)
         case Speed(Float64)
         case Hold(Float64)
+        case Cast(Cast.Cue)
     }
 
     /// 舞台。shot = 今の背景、under = 重ねている間だけ下に残す前の背景、underZoom = 前の背景の寄りの倍率、
     /// fadeFrom / fadeSeconds = 重ね始めた時刻と長さ、mode = 文章の出し方、ambience = 鳴り続ける環境音の名前、
     /// particles = パーティクルの演出の名前、shakeFrom = 揺れ始めた時刻と強さ、dim = 黒の濃さ、flash = 白飛びの始まりと長さ、
-    /// zoom = 背景の寄りの倍率、text = 字の見せ方、speed = 字の出る速さの倍率、hold = 効果音を聞かせる間、送りを受けない時刻。
+    /// zoom = 背景の寄りの倍率、text = 字の見せ方、speed = 字の出る速さの倍率、hold = 効果音を聞かせる間、送りを受けない時刻、
+    /// cast = 立ち絵と小物の層。
     pub type alias Stage = {
         shot = Option[Shot],
         under = Option[Shot],
@@ -102,7 +107,8 @@ mod Stage {
         zoom = Ramp,
         text = TextStyle,
         speed = Float64,
-        hold = Option[Clock.Time[Story]]
+        hold = Option[Clock.Time[Story]],
+        cast = Cast.Layer
     }
 
     def restAt(value: Float64): Ramp = { initial = value, target = value, start = Clock.never(), seconds = 0.0 }
@@ -111,11 +117,12 @@ mod Stage {
     pub def empty(): Stage =
         { shot = None, under = None, underZoom = 1.0, fadeFrom = Clock.never(), fadeSeconds = 0.0, mode = Mode.Nvl,
           ambience = None, particles = None, shakeFrom = None, dim = restAt(0.0), flash = None, zoom = restAt(1.0),
-          text = { pos = TextPos.Bottom, size = TextSize.Normal, align = TextAlign.Left }, speed = 1.0, hold = None }
+          text = { pos = TextPos.Bottom, size = TextSize.Normal, align = TextAlign.Left }, speed = 1.0, hold = None,
+          cast = Cast.empty() }
 
     /// Talk の語彙に載せるコマンドの名前（wait はエンジンが読むので入れない）。
     pub def commandNames(): List[String] =
-        "bg" :: "nvl" :: "adv" :: "clear" :: "ambience" :: "se" :: "fx" :: "shake" :: "dim" :: "flash" :: "zoom" :: "text" :: "speed" :: "hold" :: Nil
+        "bg" :: "nvl" :: "adv" :: "clear" :: "ambience" :: "se" :: "fx" :: "shake" :: "dim" :: "flash" :: "zoom" :: "text" :: "speed" :: "hold" :: "char" :: "item" :: Nil
 
     /// 環境音の名前（<<ambience 名>> の名）→ project.json の sounds の名前。
     pub def ambienceSound(name: String): String = "amb_${name}"
@@ -152,8 +159,9 @@ mod Stage {
         case TextSize.Huge   => 2.0
     }
 
-    /// コマンドの意味を読む。写真・時間帯の名前は backdrops にあるかまで見る（無い名前で背景が消えないように）。
-    pub def cueOf(backdrops: BackdropDoc.Doc, command: Yarn.Command): Result[String, Cue] =
+    /// コマンドの意味を読む。写真・時間帯の名前は backdrops に、人物・小物・表情・位置の名前は cast にあるかまで見る（無い名前で舞台が消えないように）。
+    pub def cueOf(res: Res.Res, command: Yarn.Command): Result[String, Cue] =
+        let backdrops = res#backdrops;
         let at = " (${Yarn.sourceText(command#source)})";
         let two = (a, b, make) -> match (Float64.fromString(a), Float64.fromString(b)) {
             case (Some(x), Some(y)) => Ok(make(x, Float64.max(0.0, y)))
@@ -194,6 +202,8 @@ mod Stage {
                     case (Some(pos), Some(size), Some(align)) => Ok(Cue.Text({ pos = pos, size = size, align = align }))
                     case _ => Err("<<text 位置 大きさ 揃え>> の名前が読めない${at}")
                 }
+            case ("char", _)            => Cast.cueOf(res#cast, command) |> Result.map(Cue.Cast)
+            case ("item", _)            => Cast.cueOf(res#cast, command) |> Result.map(Cue.Cast)
             case (name, _)              => Err("<<${name}>> の引数が足りない${at}")
         }
 
@@ -222,6 +232,7 @@ mod Stage {
         case Cue.Text(style)        => { text = style | stage }
         case Cue.Speed(rate)        => { speed = rate | stage }
         case Cue.Hold(seconds)      => { hold = Some(Clock.after(seconds, now)) | stage }
+        case Cue.Cast(c)            => { cast = Cast.apply(now, c, stage#cast) | stage }
         case Cue.Clear              => stage
         case Cue.Se(_)              => stage
     }
@@ -229,7 +240,7 @@ mod Stage {
     /// 演出の途中を終わりの形にする（セーブから戻った時・描き出しで場面を作る時）。
     pub def settle(stage: Stage): Stage =
         { under = None, fadeFrom = Clock.never(), shakeFrom = None, flash = None, hold = None,
-          dim = restAt(stage#dim#target), zoom = restAt(stage#zoom#target) | stage }
+          dim = restAt(stage#dim#target), zoom = restAt(stage#zoom#target), cast = Cast.settle(stage#cast) | stage }
 
     /// 効果音 name を聞かせる秒（この間は送りを受けない）。
     def holdSecondsOf(name: String): Float64 = match name {

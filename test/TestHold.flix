@@ -3,7 +3,7 @@
 // 写真・音の名前は Doc（novel.backdrops.json の texture・Stage.ambienceSound）から引き、秒は novel.kind.json から引く。
 mod TestHold {
 
-    use fge::{App, Clock, LoadProgress, Resources}
+    use fge::{App, Clock, LoadProgress, Render, Resources}
     use TestKit.{advance, begun, quiet, readTo, readUntil, stepBy}
 
     def kind(res: Res.Res): KindDoc.Rec = KindDoc.rec(res#kind)
@@ -191,6 +191,15 @@ mod TestHold {
                         (loaded |> Option.map(World.holdPhaseOf), thumb))
 
     @Test
+    def testHoldDropsTheRailLongPress(): Unit \ {Assert, Fs.FileRead} =
+        // 列を押したまま素材を待つ黒に入ったら、長押しを捨てる（明けた最初のフレームで「離した」と読まない）。
+        let res = TestKit.res();
+        let held = missingOf(texture(res, "bedroom") :: Nil, res);
+        let pressing = { grab = World.Grab.LongPress(0, Clock.zero()) | waitingForBedroom(res) };
+        let w = Controls.interact({ viewport = Layout.size(Layout.Fit.Regular) | App.emptyFrame() }, held, pressing);
+        Assert.assertEq(expected = World.Grab.Free, w#grab)
+
+    @Test
     def testToTitleDropsTheHold(): Unit \ {Assert, Fs.FileRead} =
         // タイトルへ戻ると待ちは消える（タイトルの写真は後回しにしない決まりなので、タイトルでは待たない）。
         let res = TestKit.res();
@@ -209,4 +218,60 @@ mod TestHold {
                                    LoadProgress.DecodeBudget.Covered(50.0) :: LoadProgress.DecodeBudget.Paused :: Nil,
                         budgetOf(TestKit.w0(res)) :: budgetOf(tapWait) :: budgetOf(typing) :: budgetOf(waitingForBedroom(res)) ::
                         budgetOf(World.toCredits(res, tapWait)) :: Nil)
+
+
+    // ══ 待ちの印（novel.theme.json の loadingMark） ══
+
+    /// 待ちの印の形を mark に替えた描く元。
+    def withLoadingMark(mark: ThemeDoc.LoadingMark, res: Res.Res): Res.Res =
+        Res.withTheme(ThemeDoc.withLoadingMark(mark, res#theme), res)
+
+    /// 寝室の背景を黒のまま待ち、waited 秒待った所。
+    def waitedFor(res: Res.Res, waited: Float64): World.World =
+        waitingForBedroom(res) |> World.mapRead(r -> { hold = r#hold |> Option.map(h -> { waited = waited | h }) | r })
+
+    /// 描き出しと同じ字のアトラスで、横の画面の hud を組む。
+    def hudOf(res: Res.Res, w: World.World): List[Render.PlacedItem] \ IO =
+        let ctx = App.viewCtxOf(SceneRender.cfgOf("debug", Map.empty())#fontAtlas, SceneRender.design());
+        View.hud(ctx, res, w)
+
+    def textsOf(items: List[Render.PlacedItem]): List[String] =
+        items |> List.filterMap(placed -> match placed#item {
+            case Render.Item.Text(t) => Some(t#text)
+            case _                   => None
+        })
+
+    /// 印が出る前（待ち始め）と、holdMarkSeconds を過ぎた所の hud の描き物の数。
+    def markCounts(res: Res.Res): (Int32, Int32) \ IO =
+        let marked = kind(res)#holdMarkSeconds + 0.5;
+        let held = missingOf(texture(res, "bedroom") :: Nil, res);
+        (List.length(hudOf(held, waitedFor(res, 0.0))), List.length(hudOf(held, waitedFor(res, marked))))
+
+    @Test
+    def testDotsMarkAppearsAfterHoldMarkSeconds(): Unit \ {Assert, Fs.FileRead, IO} =
+        // loadingMark = dots: 黒のまま holdMarkSeconds を過ぎると、待ち始めより描き物が増える（点 3 つ）。
+        let (before, after) = markCounts(withLoadingMark(ThemeDoc.LoadingMark.Dots, TestKit.res()));
+        Assert.assertTrue(after > before)
+
+    @Test
+    def testRingMarkShowsTheWaitingLabel(): Unit \ {Assert, Fs.FileRead, IO} =
+        // loadingMark = ring: holdMarkSeconds を過ぎた hud の字に、labels の waiting が入る。
+        let res = withLoadingMark(ThemeDoc.LoadingMark.Ring, TestKit.res());
+        let held = missingOf(texture(res, "bedroom") :: Nil, res);
+        let word = StoryDoc.labelOf(StoryDoc.Label.Waiting, res#story);
+        let texts = textsOf(hudOf(held, waitedFor(res, kind(res)#holdMarkSeconds + 0.5)));
+        Assert.assertTrue(List.memberOf(word, texts))
+
+    @Test
+    def testNoneMarkDrawsOnlyTheDark(): Unit \ {Assert, Fs.FileRead, IO} =
+        // loadingMark = none: holdMarkSeconds を過ぎても描き物は待ち始めと同じ（黒の地だけ）。
+        let (before, after) = markCounts(withLoadingMark(ThemeDoc.LoadingMark.Hidden, TestKit.res()));
+        Assert.assertEq(expected = before, after)
+
+    @Test
+    def testOnlyTheThreeLoadingMarkWordsAreRead(): Unit \ Assert =
+        // 読める字は dots / ring / none の 3 つだけ（ほかの字は Doc を読む時に 1 行知らせて dots へ落とす）。
+        // WhyNot: 知らない字を fromJson に通して確かめない — 知らせの 1 行が標準エラーに出ると、テストの道具が失敗と数える。
+        let read = ("dots" :: "ring" :: "none" :: "spinner" :: Nil) |> List.map(ThemeDoc.loadingMarkOf);
+        Assert.assertEq(expected = Some(ThemeDoc.LoadingMark.Dots) :: Some(ThemeDoc.LoadingMark.Ring) :: Some(ThemeDoc.LoadingMark.Hidden) :: None :: Nil, read)
 }

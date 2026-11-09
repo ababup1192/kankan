@@ -7,6 +7,10 @@
   演出はコマンドで書き、意味は `src/Stage.flix`。セーブから戻る時はノードの頭から当て直すので、ノードの頭で `<<dim>>` `<<text>>` `<<speed>>` を書く。
 - **直接見せずに想像させる**: 目に釘が刺さった顔は見せない。`assets/bg/face.jpg` は目元を暗くぼかした版で、口の笑いだけが残る。
 - **音は録音**: 合成の音は使わない（`ui_*` の返事の音を除く）。カン、カンは全編で同じ録音を使い、距離だけ焼き分ける。
+- **縦の画面の操作と立ち絵はテンプレートの物**: 右の列と右上の …（`src/Rail.flix`・大きさは `assets/novel.rail.json`）、
+  待ちの印（`assets/novel.theme.json` の `loadingMark` = dots）、立ち絵と小物（`<<char>>` `<<item>>`・`src/Cast.flix`）は
+  サウンドノベルのテンプレートから取った。立ち絵は仕組みだけで、`assets/novel.cast.json` の cast と props は空（人物は写真で見せる）。
+  テンプレートの差分を当て直す時のベースは `.template-base` の commit（`git merge-file` で 1 本ずつ当てる）。
 - **ブラウザ版の書き出しは project.json の web 欄**: 文言 `startPrompt` は「タッチして開始」のまま。写真の背景は
   `compress.lossyImages` の q85。背景・環境音・効果音を足したら `deferred` に入れるか決める（タイトルの背景と最初に鳴る音は入れない。
   書き方と届く前のふるまいは engine の `docs/startup.md`）。届く前の背景・環境音で暗転して待つ規則は `WorldRead` の「素材の待ち」の節

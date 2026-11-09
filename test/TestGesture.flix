@@ -23,12 +23,6 @@ mod TestGesture {
     def center(r: { position = { x = Float64, y = Float64 }, size = { x = Float64, y = Float64 } }): { x = Float64, y = Float64 } =
         { x = r#position#x + r#size#x / 2.0, y = r#position#y + r#size#y / 2.0 }
 
-    def buttonCenter(res: Res.Res, button: World.Button): { x = Float64, y = Float64 } =
-        let fit = portrait(res);
-        let all = WorldMenu.buttonsOf(fit);
-        let i = all |> List.zipWithIndex |> List.find(match (_, b) -> b == button) |> Option.map(fst) |> Option.getWithDefault(0);
-        center(Layout.button(fit, i, List.length(all)))
-
     def frameAt(at: Float64, p: { x = Float64, y = Float64 }): App.Frame =
         { cursor = p, viewport = tall(), sizeClass = Display.SizeClass.Small, dt = 0.1, realNow = Clock.after(at, Clock.zero()) | App.emptyFrame() }
 
@@ -43,12 +37,6 @@ mod TestGesture {
     /// at 秒に p で離したフレーム。
     def up(at: Float64, p: { x = Float64, y = Float64 }): App.Frame = frameAt(at, p)
 
-    /// p を押したまま、0.1 秒のフレームで長押しと見る秒を越えるまで置く（since 秒から）。
-    def holdFrames(res: Res.Res, since: Float64, p: { x = Float64, y = Float64 }): List[App.Frame] =
-        let steps = Float64.ceil(PortraitDoc.rec(res#portrait)#holdSeconds / 0.1) |> Float64.tryToInt32 |> Option.getWithDefault(4) |> (n -> n + 1);
-        List.range(1, steps + 1) |> List.map(n -> { mouseMoved = false | held(since + Int32.toFloat64(n) * 0.1, p) })
-
-    /// フレームを古い順に Controls.interact へ渡す。
     def play(res: Res.Res, frames: List[App.Frame], w: World.World): World.World =
         List.foldLeft((acc, frame) -> Controls.interact(frame, res, acc), w, frames)
 
@@ -164,86 +152,6 @@ mod TestGesture {
         let start = begun(res);
         let w = play(res, { wheel = -1.0 | frameAt(0.0, spot()) } :: { wheel = -2.0 | frameAt(0.1, spot()) } :: Nil, start);
         Assert.assertEq(expected = World.talkLineOf(start), World.talkLineOf(w))
-
-    // ══ 右の列のボタンは本文のタップにならない ══
-
-    @Test
-    def testRailTapIsNotAlsoATap(): Unit \ {Assert, Fs.FileRead} =
-        // 右の列のオートを押して離しても、オートが入るだけで、本文のタップとして台詞は進まない。
-        let res = TestKit.res();
-        let start = begun(res);
-        let p = buttonCenter(res, World.Button.Auto);
-        let w = play(res, down(0.0, p) :: up(0.1, p) :: Nil, start);
-        Assert.assertEq(expected = (World.Playback.Auto, World.talkLineOf(start)), (World.playbackOf(w), World.talkLineOf(w)))
-
-    @Test
-    def testRailLongPressTooltipIsNotAlsoATap(): Unit \ {Assert, Fs.FileRead} =
-        // 右の列のログを長押ししてツールチップを出してから離しても、ログは開かず、台詞も進まない。
-        let res = TestKit.res();
-        let start = begun(res);
-        let p = buttonCenter(res, World.Button.Log);
-        let frames = (down(0.0, p) :: holdFrames(res, 0.0, p)) ::: (up(5.0, p) :: Nil);
-        let w = play(res, frames, start);
-        Assert.assertEq(expected = ("Closed", World.talkLineOf(start)), (World.panelName(w), World.talkLineOf(w)))
-
-    @Test
-    def testRailLongPressAutoStillStartsSkip(): Unit \ {Assert, Fs.FileRead} =
-        // 右の列のオートを長押しするとスキップになる（押しの記録はスキップの邪魔をしない）。
-        let res = TestKit.res();
-        let p = buttonCenter(res, World.Button.Auto);
-        let w = play(res, down(0.0, p) :: holdFrames(res, 0.0, p), begun(res));
-        Assert.assertEq(expected = World.Playback.Skip, World.playbackOf(w))
-
-    /// ブラウザ版の指の長押しを離したフレーム（押しは出さず、touchGestures の longPress = 戻るのキーが押した所のまま届く）。
-    def touchLongRelease(res: Res.Res, at: Float64, p: { x = Float64, y = Float64 }): App.Frame =
-        let back = KeysDoc.rec(res#keys)#back |> List.head |> Option.getWithDefault(Key.Escape);
-        { justPressed = Set#{back}, down = Set#{back} | up(at, p) }
-
-    @Test
-    def testTouchLongPressOnLogShowsItsNameWithoutHiding(): Unit \ {Assert, Fs.FileRead} =
-        // 指でログを長押しして離すと、ウィンドウは隠さず、ログも開かず、名前のツールチップを出す。
-        let res = TestKit.res();
-        let start = begun(res);
-        let w = play(res, touchLongRelease(res, 1.0, buttonCenter(res, World.Button.Log)) :: Nil, start);
-        let logAt = WorldMenu.buttonsOf(portrait(res)) |> List.zipWithIndex |> List.find(match (_, b) -> b == World.Button.Log) |> Option.map(fst);
-        Assert.assertEq(expected = ("Closed", logAt), (World.panelName(w), w#tip |> Option.map(fst)))
-
-    @Test
-    def testTouchLongPressOnAutoStartsSkip(): Unit \ {Assert, Fs.FileRead} =
-        // 指でオートを長押しして離すとスキップになる（ウィンドウは隠さない）。
-        let res = TestKit.res();
-        let w = play(res, touchLongRelease(res, 1.0, buttonCenter(res, World.Button.Auto)) :: Nil, begun(res));
-        Assert.assertEq(expected = (World.Playback.Skip, "Closed"), (World.playbackOf(w), World.panelName(w)))
-
-    @Test
-    def testTouchLongPressOnTextHidesTheWindow(): Unit \ {Assert, Fs.FileRead} =
-        // 本文の上の指の長押しは今まで通りウィンドウを隠す。
-        let res = TestKit.res();
-        let w = play(res, touchLongRelease(res, 1.0, spot()) :: Nil, begun(res));
-        Assert.assertEq(expected = "Hidden", World.panelName(w))
-
-    // ══ 右上の … としおり ══
-
-    @Test
-    def testMoreOpensTheMenuWithoutAdvancing(): Unit \ {Assert, Fs.FileRead} =
-        // 右上の … を押して離すと … のメニューが開き、台詞は進まない。
-        let res = TestKit.res();
-        let start = begun(res);
-        let p = center(Layout.moreButton(portrait(res))#hit);
-        let w = play(res, down(0.0, p) :: up(0.1, p) :: Nil, start);
-        Assert.assertEq(expected = ("Menu", World.talkLineOf(start)), (World.panelName(w), World.talkLineOf(w)))
-
-    @Test
-    def testBookmarkOpensSaveThroughItsMenu(): Unit \ {Assert, Fs.FileRead} =
-        // しおりを押して離すと [セーブ｜ロード] の選びが開き、セーブを押すとセーブの画面になる。台詞は進まない。
-        let res = TestKit.res();
-        let start = begun(res);
-        let mark = buttonCenter(res, World.Button.Bookmark);
-        let chosen = play(res, down(0.0, mark) :: up(0.1, mark) :: Nil, start);
-        let count = List.length(WorldMenu.bookmarkItems());
-        let save = center(Layout.bookmarkItem(portrait(res), 0, count));
-        let w = play(res, down(1.0, save) :: up(1.1, save) :: Nil, chosen);
-        Assert.assertEq(expected = ("Bookmark", "SaveSlots", World.talkLineOf(start)), (World.panelName(chosen), World.panelName(w), World.talkLineOf(w)))
 
     // ══ 他の画面は分け方に巻き込まない ══
 

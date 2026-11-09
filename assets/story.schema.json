@@ -100,7 +100,7 @@
         "menu": {
           "type": "string"
         },
-        "bookmark": {
+        "saveLoad": {
           "type": "string"
         },
         "backToTitle": {
@@ -248,6 +248,9 @@
           "type": "string"
         },
         "noRollback": {
+          "type": "string"
+        },
+        "waiting": {
           "type": "string"
         }
       },

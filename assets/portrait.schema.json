@@ -1,5 +1,5 @@
 {
-  "//": "novel.portrait.json の形の宣言（Studio の sections 方言）。縦の画面の時だけ使う字と押せる物の大きさ。置き場所はコード（src/Layout.flix）。既定は src/PortraitDoc.flix の defaults() が正。",
+  "//": "novel.portrait.json の形の宣言（Studio の sections 方言）。縦の画面の時だけ使う字と押せる物の大きさ。置き場所はコード（src/Layout.flix）。右端の操作の列と … の大きさは novel.rail.json（rail.schema.json）。既定は src/PortraitDoc.flix の defaults() が正。",
   "version": 1,
   "sections": {
     "bodySize": {
@@ -42,122 +42,22 @@
       "max": 32,
       "default": 21.0
     },
-    "iconSize": {
+    "pageBottom": {
       "kind": "field",
       "type": "float",
-      "label": "右の列の丸いアイコンの直径（px）",
-      "group": "読む間",
+      "label": "頁と選択肢の下端から画面の下までの空き（px。下にツールバーを重ねるブラウザが隠す分）",
+      "group": "頁",
       "order": 5,
-      "min": 30,
-      "max": 80,
-      "default": 49.0
-    },
-    "buttonHeight": {
-      "kind": "field",
-      "type": "float",
-      "label": "右の列の押せる正方形の辺（px）",
-      "group": "読む間",
-      "order": 6,
-      "min": 44,
-      "max": 96,
-      "default": 66.0
-    },
-    "railRight": {
-      "kind": "field",
-      "type": "float",
-      "label": "右の列と画面の右端の間（px）",
-      "group": "読む間",
-      "order": 7,
       "min": 0,
-      "max": 60,
-      "default": 14.0
-    },
-    "railGap": {
-      "kind": "field",
-      "type": "float",
-      "label": "… と右の列の間（px）",
-      "group": "読む間",
-      "order": 8,
-      "min": 0,
-      "max": 60,
-      "default": 4.0
-    },
-    "moreTop": {
-      "kind": "field",
-      "type": "float",
-      "label": "右上の … と画面の上の間（px）",
-      "group": "読む間",
-      "order": 9,
-      "min": 0,
-      "max": 80,
-      "default": 12.0
-    },
-    "moreSize": {
-      "kind": "field",
-      "type": "float",
-      "label": "右上の … の丸の直径（px）",
-      "group": "読む間",
-      "order": 10,
-      "min": 30,
-      "max": 80,
-      "default": 46.0
-    },
-    "moreHeight": {
-      "kind": "field",
-      "type": "float",
-      "label": "右上の … の押せる正方形の辺（px）",
-      "group": "読む間",
-      "order": 11,
-      "min": 44,
-      "max": 96,
-      "default": 66.0
-    },
-    "holdSeconds": {
-      "kind": "field",
-      "type": "float",
-      "label": "長押しと見る秒",
-      "group": "読む間",
-      "order": 12,
-      "min": 0.2,
-      "max": 1.5,
-      "default": 0.4
-    },
-    "tooltipTextSize": {
-      "kind": "field",
-      "type": "float",
-      "label": "長押しで出す名前の字（px）",
-      "group": "読む間",
-      "order": 13,
-      "min": 12,
-      "max": 32,
-      "default": 20.0
-    },
-    "bookmarkItemWidth": {
-      "kind": "field",
-      "type": "float",
-      "label": "しおりの [セーブ｜ロード] の 1 つの幅（px）",
-      "group": "読む間",
-      "order": 14,
-      "min": 80,
-      "max": 200,
-      "default": 120.0
-    },
-    "menuWidth": {
-      "kind": "field",
-      "type": "float",
-      "label": "… のメニューの幅（px）",
-      "group": "読む間",
-      "order": 15,
-      "min": 160,
       "max": 400,
-      "default": 240.0
+      "default": 196.0
     },
     "menuItemTextSize": {
       "kind": "field",
       "type": "float",
-      "label": "… としおりのメニューの字（px）",
+      "label": "… のメニューとしおりの選びの字（px）",
       "group": "読む間",
-      "order": 16,
+      "order": 7,
       "min": 14,
       "max": 36,
       "default": 22.0
@@ -165,9 +65,9 @@
     "menuItemHeight": {
       "kind": "field",
       "type": "float",
-      "label": "… としおりのメニューの 1 項目の高さ（px）",
+      "label": "… のメニューとしおりの選びの 1 項目の高さ（px）",
       "group": "読む間",
-      "order": 17,
+      "order": 8,
       "min": 44,
       "max": 100,
       "default": 66.0
@@ -177,7 +77,7 @@
       "type": "float",
       "label": "選択肢の字（px）",
       "group": "読む間",
-      "order": 18,
+      "order": 9,
       "min": 14,
       "max": 36,
       "default": 23.0
@@ -187,7 +87,7 @@
       "type": "float",
       "label": "選択肢の 1 つの高さ（px）",
       "group": "読む間",
-      "order": 19,
+      "order": 10,
       "min": 44,
       "max": 120,
       "default": 76.0
@@ -197,7 +97,7 @@
       "type": "float",
       "label": "タイトルのメニューの字（px）",
       "group": "タイトル",
-      "order": 20,
+      "order": 11,
       "min": 14,
       "max": 48,
       "default": 28.0
@@ -207,7 +107,7 @@
       "type": "float",
       "label": "タイトルのメニューの 1 つの高さ（px）",
       "group": "タイトル",
-      "order": 21,
+      "order": 12,
       "min": 44,
       "max": 100,
       "default": 68.0
@@ -217,7 +117,7 @@
       "type": "float",
       "label": "画面の右上の「戻る」の字（px）",
       "group": "画面",
-      "order": 22,
+      "order": 13,
       "min": 12,
       "max": 32,
       "default": 20.0
@@ -227,7 +127,7 @@
       "type": "float",
       "label": "画面の右上の「戻る」の高さ（px）",
       "group": "画面",
-      "order": 23,
+      "order": 14,
       "min": 44,
       "max": 96,
       "default": 66.0
@@ -237,7 +137,7 @@
       "type": "float",
       "label": "セーブ・ロードのタブの字（px）",
       "group": "画面",
-      "order": 24,
+      "order": 15,
       "min": 12,
       "max": 32,
       "default": 20.0
@@ -247,7 +147,7 @@
       "type": "float",
       "label": "セーブ・ロードのタブの高さ（px）",
       "group": "画面",
-      "order": 25,
+      "order": 16,
       "min": 44,
       "max": 96,
       "default": 66.0
@@ -257,7 +157,7 @@
       "type": "float",
       "label": "設定の行の字（px）",
       "group": "画面",
-      "order": 26,
+      "order": 17,
       "min": 12,
       "max": 32,
       "default": 20.0
@@ -267,7 +167,7 @@
       "type": "float",
       "label": "設定の行の高さ（px）",
       "group": "画面",
-      "order": 27,
+      "order": 18,
       "min": 44,
       "max": 96,
       "default": 66.0
@@ -277,7 +177,7 @@
       "type": "float",
       "label": "確認のウィンドウのはい・いいえの字（px）",
       "group": "画面",
-      "order": 28,
+      "order": 19,
       "min": 12,
       "max": 36,
       "default": 22.0
@@ -287,7 +187,7 @@
       "type": "float",
       "label": "確認のウィンドウのはい・いいえの高さ（px）",
       "group": "画面",
-      "order": 29,
+      "order": 20,
       "min": 44,
       "max": 96,
       "default": 66.0

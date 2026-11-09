@@ -88,7 +88,21 @@ mod SceneRender {
         ("small-title", "title") :: ("small-nvl", "nvl") :: ("small-adv", "adv") :: ("small-choice", "choice")
             :: ("small-save", "save") :: ("small-settings", "settings") :: ("small-ask", "ask") :: Nil
 
-    /// 縦の画面で描く場面: (描き出しの名前, 場面の名前, 画面の大きさ)。World は Shots の同じ場面の物をそのまま使う（menu と bookmark だけは worldOf）。
+    /// 描く元を替えて描く横の場面: (描き出しの名前, Shots の場面の名前)。どう替えるかは resFor。
+    /// WhyNot: Shots.names に入れない — 実機の START=shot: は World だけを替える口で、Doc（描く元）は替えられない。
+    def variantShots(): List[(String, String)] =
+        ("cast-sample", "cast") :: Nil
+
+    /// 描き出しの名前 → その場面で使う描く元。
+    /// cast-sample = テスト用の立ち絵の人物を足した描く元（CastDoc.sample）、portrait-cast-veil = それに縦の頁の覆いを人物が出ている間だけ薄くする倍率を入れた描く元。ほかはそのまま。
+    def resFor(name: String, res: Res.Res): Res.Res = match name {
+        case "cast-sample"          => Res.withCast(CastDoc.sample(), res)
+        case "portrait-cast-sample" => Res.withCast(CastDoc.sample(), res)
+        case "portrait-cast-veil"   => Res.withCast(CastDoc.Doc.Doc({ portraitVeilWithCast = 0.5 | CastDoc.rec(CastDoc.sample()) }), res)
+        case _                      => res
+    }
+
+    /// 縦の画面で描く場面: (描き出しの名前, 場面の名前, 画面の大きさ)。World は Shots の同じ場面の物をそのまま使う（menu・saveload・tooltip だけは worldOf）。
     /// 太い縦の画面（360×640）は縦の design の下限の高さで、並べ方がいちばん窮屈になる所を見る。
     def portraitShots(): List[(String, String, Vec2.Vec2)] =
         let tall = Display.defaultPortraitView();
@@ -97,32 +111,51 @@ mod SceneRender {
             :: ("portrait-face", "face", tall) :: ("portrait-log", "log", tall) :: ("portrait-save", "save", tall)
             :: ("portrait-settings", "settings", tall) :: ("portrait-ask", "ask", tall)
             :: ("portrait-phone", "phone", tall) :: ("portrait-menu", "menu", tall)
-            :: ("portrait-bookmark", "bookmark", tall)
+            :: ("portrait-saveload", "saveload", tall) :: ("portrait-tooltip", "tooltip", tall)
+            :: ("portrait-cast-sample", "cast", tall) :: ("portrait-cast-veil", "cast", tall)
             :: ("portrait-short-nvl", "nvl", short) :: ("portrait-short-save", "save", short)
             :: ("portrait-short-settings", "settings", short) :: Nil
 
-    /// 場面の名前 → World。縦の画面だけの場面: menu = 台詞の上で、オートを点けて右上の … のメニューを開いた所、
-    /// bookmark = 同じ所でしおりの [セーブ｜ロード] を開いた所。
-    // WhyNot: menu と bookmark を Shots.names に入れない — … としおりは縦の画面にしか無く、Shots.names は横の描き出しと実機の START=shot: の口でもある。
+    /// 場面の名前 → World。縦の画面だけの場面（どれも女の台詞の上）: menu = オートを点けて右上の … のメニューを開いた所、
+    /// saveload = しおりから [セーブ｜ロード] の選びを開いた所、tooltip = 指の長押しで右の列のログの名前を出した所、
+    /// cast = テスト用の立ち絵の人物を出した所（横と縦の両方で描く）。
+    // WhyNot: 縦の画面だけの場面を Shots.names に入れない — 右の列と … は縦の画面にしか無く、Shots.names は横の描き出しと実機の START=shot: の口でもある。
     def worldOf(scene: String, res: Res.Res): Option[World.World] = match scene {
-        case "menu"     => Shots.worldOf("woman", res) |> Option.map(w ->
-                               World.mapRead(r -> { playback = World.Playback.Auto | r }, { panel = World.Panel.Menu(0) | w }))
-        case "bookmark" => Shots.worldOf("woman", res) |> Option.map(w -> { panel = World.Panel.Bookmark(0) | w })
+        case "menu"     =>
+            Shots.worldOf("woman", res) |> Option.map(w ->
+                World.mapRead(r -> { playback = World.Playback.Auto | r }, { panel = World.Panel.Menu(0) | w }))
+        case "saveload" => Shots.worldOf("woman", res) |> Option.map(w -> { panel = World.Panel.SaveLoadPick(0) | w })
+        case "tooltip"  => Shots.worldOf("woman", res) |> Option.map(w -> World.mapRead(r -> { tip = Some((logIndex(), w#realNow)) | r }, w))
+        case "cast"     => Shots.worldOf("woman", res) |> Option.map(World.mapRead(r -> { stage = { cast = sampleLayer() | r#stage } | r }))
         case _          => Shots.worldOf(scene, res)
     }
 
+    /// テスト用の立ち絵の人物を、既定の位置と表情で出し終えた層。
+    def sampleLayer(): Cast.Layer =
+        let entry = CastDoc.entryOf(CastDoc.Kind.Character, CastDoc.sampleName(), CastDoc.sample());
+        let figures = entry |> Option.map(e -> { name = CastDoc.sampleName(), face = e#face, slot = e#slot }) |> Option.toList;
+        Cast.layerOf({ cast = figures, prop = None })
+
+    /// 縦の画面の右の列のログの番号。
+    def logIndex(): Int32 =
+        WorldMenu.buttonIndexOf(Layout.Fit.Portrait(PortraitDoc.rec(PortraitDoc.defaults()), Display.defaultPortraitView()), World.Button.Log)
+            |> Option.getWithDefault(0)
+
     /// 描き出せる名前の全部（Shots の場面と、小さい画面と縦の画面の場面）。
     def allNames(): List[String] =
-        List.flatten(Shots.names() :: (smallShots() |> List.map(fst)) :: (portraitShots() |> List.map(match (name, _, _) -> name)) :: Nil)
+        List.flatten(Shots.names() :: (variantShots() |> List.map(fst)) :: (smallShots() |> List.map(fst))
+                     :: (portraitShots() |> List.map(match (name, _, _) -> name)) :: Nil)
 
     def shotsInto(outDir: String, keep: String -> Bool): List[String] \ IO =
         discard (new File(outDir)).mkdirs();
         let cfg = cfgOf(outDir, texturesOf());
-        let res = loadRes();
+        let loaded = loadRes();
         let regular = Shots.names() |> List.map(name -> (name, name, Look.Landscape(Display.SizeClass.Large)));
+        let variant = variantShots() |> List.map(match (name, scene) -> (name, scene, Look.Landscape(Display.SizeClass.Large)));
         let small = smallShots() |> List.map(match (name, scene) -> (name, scene, Look.Landscape(Display.SizeClass.Small)));
         let portrait = portraitShots() |> List.map(match (name, scene, view) -> (name, scene, Look.Portrait(view)));
-        List.flatten(regular :: small :: portrait :: Nil) |> List.filter(match (name, _, _) -> keep(name)) |> List.filterMap(match (name, scene, look) ->
+        List.flatten(regular :: variant :: small :: portrait :: Nil) |> List.filter(match (name, _, _) -> keep(name)) |> List.filterMap(match (name, scene, look) ->
+            let res = resFor(name, loaded);
             worldOf(scene, res) |> Option.map(w -> {
                 let path = shootAs(look, res, cfg, w, name);
                 App.Headless.writeShotRecord(outDir, name, Some(E2e.fingerprint(res, w)));

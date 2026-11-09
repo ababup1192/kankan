@@ -8,8 +8,8 @@
 // **これは数ある画風の 1 つでしかない。** 真似してほしいのは「写真を奥へ下げて文章を主役にする」層の分け方。
 //
 // ── 画面の層（奥から手前へ）──
-//   world: 前の背景（重ねている間だけ）→ 今の背景（進みで現れる）→ パーティクル（蛍）   … 揺れはこの層だけに掛かる
-//   hud:   NVL の幕 / ADV のウィンドウ → 本文（ルビつき）・名前 → 送りの印 → 選択肢 → クイックメニュー
+//   world: 前の背景（重ねている間だけ）→ 今の背景（進みで現れる）→ パーティクル（蛍）→ 立ち絵 → 小物   … 揺れはこの層だけに掛かる
+//   hud:   NVL の幕 / ADV のウィンドウ → 本文（ルビつき）・名前 → 送りの印 → 選択肢 → クイックメニュー（縦の画面は右の列と … とツールチップ）
 //          → 素材を待つ間の黒と待ちの印（ブラウザ版で背景・環境音がまだ届いていない時）
 //          → 画面（バックログ・セーブ・ロード・設定。セーブの枠のサムネはその時の画面を同じ関数で描いて縮める）→ 確認のウィンドウ → 知らせ
 //          タイトルとクレジットも hud（写真の上に字だけを置く画面）
@@ -25,20 +25,19 @@ mod View {
     use fge::{App, Clock, Color, DrawCmd, FontAtlas, Fx, Num, RawDraw, Rect2, Render, RichText, ShaderDoc, TextDraw, UiScroll, Vec2}
 
     /// どの場面でも使う描く元: Doc とシナリオ（res）・セーブデータ（既読と設定と枠）・マウスの位置・2 本の時計の今・
-    /// 並べ方の組（fit。Controls が当たりを取る時と同じ組）・押している間の掴み（grab。長押しのツールチップ）。
+    /// 並べ方の組（fit。Controls が当たりを取る時と同じ組）・押している間の掴み（grab。列の長押しのツールチップ）。
     pub type alias Env = {
         res = Res.Res,
         saves = Saves.Saves,
         pointer = { x = Float64, y = Float64 },
         grab = World.Grab,
-        tip = Option[(Int32, Clock.Time[Clock.Real])],
         realNow = Clock.Time[Clock.Real],
         storyNow = Clock.Time[Stage.Story],
         fit = Layout.Fit
     }
 
     pub def envOf(fit: Layout.Fit, res: Res.Res, w: World.World): Env =
-        { res = res, saves = w#saves, pointer = w#pointer, grab = w#grab, tip = w#tip, realNow = w#realNow, storyNow = World.now(w), fit = fit }
+        { res = res, saves = w#saves, pointer = w#pointer, grab = w#grab, realNow = w#realNow, storyNow = World.now(w), fit = fit }
 
     /// 描く画面の区分と design の向き・大きさから並べ方の組を選ぶ（Controls が Frame から引く組と同じ）。
     // WhyNot: ctx#visible#size を design の大きさとして読んでよいのは、このゲームが camera を使わないから（HUD は常に design 全体）。
@@ -67,7 +66,7 @@ mod View {
         let stage = World.stageOf(res, w);
         let k = KindDoc.rec(env#res#kind);
         let (dx, dy) = Stage.shakeOffset(env#storyNow, k#shakeSeconds, k#shakePx, stage);
-        let moved = List.append(backdrops(env, stage), particles(env, stage))
+        let moved = List.flatten(backdrops(env, stage) :: particles(env, stage) :: castLayer(env, stage) :: Nil)
             |> List.map(placed -> { at = { x = placed#at#x + dx, y = placed#at#y + dy } | placed });
         List.append(moved, overlays(env, stage))
 
@@ -79,7 +78,7 @@ mod View {
             case World.Panel.Closed => false
             case World.Panel.Hidden => false
             case World.Panel.Menu(_) => false
-            case World.Panel.Bookmark(_) => false
+            case World.Panel.SaveLoadPick(_) => false
             case _                  => true
         };
         let screen = if (covered) Nil else match w#scene {
@@ -87,7 +86,7 @@ mod View {
             case World.Scene.Credits(startedAt, _) => credits(atlas, env, startedAt) |> List.map(fadeTo(Float64.min(1.0, Clock.since(startedAt, env#realNow) / 3.0)))
             case World.Scene.Reading(r)       => if (w#panel == World.Panel.Hidden) Nil else shaken(env, r, reading(atlas, env, r))
         };
-        let holding = World.readOf(w) |> Option.flatMap(r -> r#hold) |> Option.map(holdLayer(env)) |> Option.getWithDefault(Nil);
+        let holding = World.readOf(w) |> Option.flatMap(r -> r#hold) |> Option.map(holdLayer(atlas, env)) |> Option.getWithDefault(Nil);
         List.flatten(screen :: holding :: panel(res, atlas, env, w) :: askLayer(atlas, env, w#ask) :: toast(atlas, env, World.toastOf(res, w)) :: Nil)
 
     def realSeconds(env: Env): Float64 = Clock.secondsOf(env#realNow)
@@ -184,11 +183,17 @@ mod View {
               grade <- BackdropDoc.gradeOf(shot#grade, env#res#backdrops))
         yield Backdrop.specOf("${shot#photo}_${shot#grade}", photo, grade)
 
+    // ── 立ち絵と小物（Cast） ──
+
+    /// 立ち絵と小物を蛍の手前（z 5）に描く。まだ届いていない絵は描かない（背景の写真と同じ扱い）。
+    def castLayer(env: Env, stage: Stage.Stage): List[Render.PlacedItem] =
+        Cast.items({ doc = env#res#cast, fit = env#fit, storyNow = env#storyNow, realNow = env#realNow, missing = env#res#missing }, stage#cast, 5)
+
     // ── 素材の待ち（ブラウザ版で背景・環境音がまだ届いていない間の暗転） ──
 
-    /// 画面を夜の地の色で覆う（黒へ重ねる・黒のまま・黒から戻す）。黒のまま holdMarkSeconds を過ぎたら右下に待ちの印。
-    /// 重ねの進みは物語の時計（画面を開くと止まる）、印の明滅は実時間。
-    def holdLayer(env: Env): World.Hold -> List[Render.PlacedItem] = hold ->
+    /// 画面を夜の地の色で覆う（黒へ重ねる・黒のまま・黒から戻す）。黒のまま holdMarkSeconds を過ぎたら待ちの印（形は novel.theme.json の loadingMark）。
+    /// 重ねの進みは物語の時計（画面を開くと止まる）、印の動きは実時間。
+    def holdLayer(atlas: FontAtlas, env: Env): World.Hold -> List[Render.PlacedItem] = hold ->
         let k = kindOf(env);
         let progress = if (k#holdFadeSeconds <= 0.0) 1.0
                        else Float64.min(1.0, Float64.max(0.0, Clock.since(hold#phaseFrom, env#storyNow) / k#holdFadeSeconds));
@@ -200,8 +205,20 @@ mod View {
         let whole = Layout.screen(env#fit);
         let veil = at(0.0, 0.0, RawDraw.box(whole#size, Backdrop.groundColor(), zHold()) |> Render.fade(alpha));
         let marked = hold#phase == World.HoldPhase.Waiting and hold#waited >= k#holdMarkSeconds;
-        let mark = if (marked) waitDots(env, { x = Layout.width(env#fit) - 60.0, y = Layout.height(env#fit) - 36.0 }, 1.0, zHoldMark()) else Nil;
+        let mark = if (marked) loadingMark(atlas, env, theme(env)#loadingMark, whole, { x = 60.0, y = 36.0 }, 1.0, zHoldMark()) else Nil;
         veil :: mark
+
+    /// 素材を待つ間の印を矩形 place（画面かサムネの枠）に置く。Dots = 右下の金の点 3 つ（左の点の中心を右下の角から inset だけ内へ）、
+    /// Ring = 真ん中に回る点の輪と字のラベル、Hidden = 何も描かない。scale = 大きさの倍率（サムネは小さく）。
+    def loadingMark(atlas: FontAtlas, env: Env, kind: ThemeDoc.LoadingMark, place: Rect2.Rect2, inset: Vec2.Vec2, scale: Float64, z: Int32): List[Render.PlacedItem] =
+        let right = place#position#x + place#size#x;
+        let bottom = place#position#y + place#size#y;
+        match kind {
+            case ThemeDoc.LoadingMark.Dots => waitDots(env, { x = right - inset#x, y = bottom - inset#y }, scale, z)
+            case ThemeDoc.LoadingMark.Ring =>
+                ringBadge(atlas, env, { x = place#position#x + place#size#x / 2.0, y = place#position#y + place#size#y / 2.0 }, scale, z)
+            case ThemeDoc.LoadingMark.Hidden  => Nil
+        }
 
     /// 待ちの印: 金の小さな点 3 つが左から順に息をするように明滅する（蛍と同じ、芯と滲む光）。
     /// origin = 左の点の中心、scale = 大きさの倍率（サムネは小さく）。
@@ -215,6 +232,36 @@ mod View {
             RawDraw.circleAt(center, 2.6 * scale, Color.lighten(color, 0.35), z + 1) |> Render.overItem(item -> Render.fade(a, item))
             :: Render.glowAt(center, 9.0 * scale, color, { alpha = 0.45 * a, blend = DrawCmd.BlendMode.Add }, z)
         })
+
+    /// 待ちの印の輪: 角の丸いラベル（上がわずかに明るい panel の地・差し色の細い縁）に、回る点の輪 8 つと labels の waiting の字。
+    /// 字が空ならラベルを輪の大きさに詰める。center = ラベルの中心。点は 0.1 秒ごとに 1 つ先へ明るさが移る。
+    def ringBadge(atlas: FontAtlas, env: Env, center: Vec2.Vec2, scale: Float64, z: Int32): List[Render.PlacedItem] =
+        let t = theme(env);
+        let word = label(StoryDoc.Label.Waiting, env);
+        let size = captionSize(env, 18.0) * scale;
+        let ring = 9.0 * scale;
+        let gap = if (String.isEmpty(word)) 0.0 else 10.0 * scale;
+        let padX = 16.0 * scale;
+        let h = 40.0 * scale;
+        let textW = if (String.isEmpty(word)) 0.0 else TextDraw.width(word, atlas, size);
+        let w = padX + 2.0 * ring + gap + textW + padX;
+        let left = center#x - w / 2.0;
+        let top = center#y - h / 2.0;
+        let plateSize = { x = w, y = h };
+        let ground = at(left, top, RawDraw.box(plateSize, t#panel, z) |> Render.fade(0.88)
+                                       |> Render.outlineA({ color = t#accent, alpha = 0.35, width = 1.0 }) |> Render.rounded(h / 2.0));
+        let sheen = at(left, top, roundedSheen(plateSize, h / 2.0, t#ink, { top = 0.08, bottom = 0.0 }, z));
+        let hub = { x = left + padX + ring, y = center#y };
+        let head = Float64.tryToInt32(Float64.floor(realSeconds(env) * 10.0)) |> Option.getWithDefault(0);
+        let dots = List.range(0, 8) |> List.map(i -> {
+            let angle = Num.pi() * 2.0 * Int32.toFloat64(i) / 8.0;
+            let a = 1.0 - Int32.toFloat64(Int32.modulo(head - i, 8)) / 8.0;
+            RawDraw.circleAt({ x = hub#x + ring * Num.cos(angle), y = hub#y + ring * Num.sin(angle) }, 1.9 * scale, t#ink, z + 1)
+                |> Render.overItem(item -> Render.fade(0.15 + 0.85 * a, item))
+        });
+        let text = if (String.isEmpty(word)) Nil
+                   else textAt(hub#x + ring + gap, center#y - size / 2.0 - 1.0, word, atlas, size, t#ink, z + 1) :: Nil;
+        ground :: sheen :: List.append(text, dots)
 
     // ── パーティクル（蛍） ──
 
@@ -350,10 +397,16 @@ mod View {
              y + b#height + Layout.paragraphGap())
         }, (Nil, area#position#y));
         let mark = waitMark(atlas, { x = area#position#x + area#size#x - 12.0, y = endY - Layout.paragraphGap() - 4.0 }, env, r);
-        List.flatten(portraitVeil(env, style#pos) :: List.flatten(List.reverse(items)) :: mark :: Nil)
+        List.flatten(portraitVeil(env, style#pos, castVeilScale(env, r#stage)) :: List.flatten(List.reverse(items)) :: mark :: Nil)
 
-    /// 縦の頁の覆い。写真の上下の帯を沈め、字の置き場の側を濃くする（真ん中の字は全体を少し沈める）。
-    def portraitVeil(env: Env, pos: Stage.TextPos): List[Render.PlacedItem] =
+    /// 人物が出ている間に縦の頁の覆いへ掛ける倍率。novel.cast.json の portraitVeilWithCast を、人物の出入りの進みに合わせて掛ける
+    /// （出ると薄く、消えると 1 に戻る）。
+    def castVeilScale(env: Env, stage: Stage.Stage): Float64 =
+        let withCast = CastDoc.rec(env#res#cast)#portraitVeilWithCast;
+        1.0 + (withCast - 1.0) * Cast.presenceOf(env#storyNow, stage#cast)
+
+    /// 縦の頁の覆い。写真の上下の帯を沈め、字の置き場の側を濃くする（真ん中の字は全体を少し沈める）。castScale = 濃さに掛ける倍率。
+    def portraitVeil(env: Env, pos: Stage.TextPos, castScale: Float64): List[Render.PlacedItem] =
         let t = theme(env);
         let stops = match pos {
             case Stage.TextPos.Bottom => (0.0, 1.0) :: (0.17, 0.82) :: (0.26, 0.0) :: (0.46, 0.0) :: (0.62, 0.82) :: (0.8, 0.96) :: (1.0, 1.0) :: Nil
@@ -364,8 +417,8 @@ mod View {
         List.zip(stops, List.drop(1, stops)) |> List.map(match ((y0, a0), (y1, a1)) -> {
             let top = size#y * y0;
             let bottom = size#y * y1;
-            let alpha0 = Float64.min(1.0, a0);
-            let alpha1 = Float64.min(1.0, a1);
+            let alpha0 = Float64.min(1.0, a0) * castScale;
+            let alpha1 = Float64.min(1.0, a1) * castScale;
             at(0.0, top, Render.gradPolygon(
                 { pos = { x = 0.0, y = 0.0 },              color = t#panel, alpha = alpha0 } ::
                 { pos = { x = size#x, y = 0.0 },           color = t#panel, alpha = alpha0 } ::
@@ -403,16 +456,18 @@ mod View {
                              { body = sizes#body, ruby = sizes#ruby }, ink#body, visible, line, env);
         List.append(name, body)
 
-    /// 縦の画面の操作: 右端の縦の列に字の無い丸いアイコン（しおり・ログ・オート）と、右上の …。押せる所は Layout.button の正方形
+    // ── 縦の画面の右の列と … ──
+
+    /// 縦の画面の操作: 右端の縦の列に字の無い丸いアイコン（しおり・ログ・オート）と、右上の …。押せる所は Rail.button の正方形
     /// （44 CSS px 以上）で、丸はその真ん中に小さく置く。オートが動いている間は丸を差し色で塗って線を暗くし ‖ にする、
     /// スキップの間はオートの縁を差し色で太くする。長押しの間はツールチップを出す。
+    // WhyNot: 列の丸に階調を入れない — 49 px の小さな記号で、面の階調は … の丸・ツールチップ・メニューの地が受け持つ。
     def portraitButtons(atlas: FontAtlas, env: Env, r: World.Read): List[Render.PlacedItem] =
         let t = theme(env);
         let all = WorldMenu.buttonsOf(env#fit);
-        let n = List.length(all);
         let rail = all |> List.zipWithIndex |> List.flatMap(match (i, button) -> {
-            let hit = Layout.button(env#fit, i, n);
-            let icon = Layout.icon(env#fit, i, n);
+            let hit = Rail.button(env#fit, i);
+            let icon = Rail.icon(env#fit, i);
             let lit = button == World.Button.Auto and r#playback == World.Playback.Auto;
             // WhyNot: スキップ中を何も出さないままにしない — 列にスキップは無く、オートの長押しで入ってオートで止めるので、オートの縁で見せる。
             let skipping = button == World.Button.Auto and r#playback == World.Playback.Skip;
@@ -426,40 +481,53 @@ mod View {
                               |> Render.rounded(icon#radius));
             disc :: iconStrokes(iconPaths(button, lit), icon#center, d, line, zButtons())
         });
-        List.flatten(rail :: moreMark(env) :: tooltip(atlas, env) :: Nil)
+        List.flatten(rail :: moreMark(env) :: tooltip(atlas, env, r) :: Nil)
 
-    /// 右上の … の印（暗い半透明の丸に点 3 つ。点の間と大きさは丸の大きさに比べて決める）。
+    /// 右上の … の印（上がわずかに明るい半透明の丸に点 3 つ。点の間と大きさは丸の大きさに比べて決める）。
     def moreMark(env: Env): List[Render.PlacedItem] =
         let t = theme(env);
-        let more = Layout.moreButton(env#fit);
+        let more = Rail.moreButton(env#fit);
         let center = more#center;
         let gap = more#radius * 0.4;
         let dot = more#radius * 0.12;
         let d = more#radius * 2.0;
         let over = isOver(more#hit, env);
-        at(center#x - more#radius, center#y - more#radius,
+        let corner = { x = center#x - more#radius, y = center#y - more#radius };
+        at(corner#x, corner#y,
            RawDraw.box({ x = d, y = d }, if (over) Color.lighten(t#panel, 0.12) else t#panel, zButtons() - 1) |> Render.fade(0.62)
                |> Render.outlineA({ color = t#ink, alpha = if (over) 0.5 else 0.18, width = 1.0 }) |> Render.rounded(more#radius))
+        :: at(corner#x, corner#y, roundedSheen({ x = d, y = d }, more#radius, t#ink, { top = 0.12, bottom = 0.0 }, zButtons()))
         :: (List.range(-1, 2) |> List.map(k -> RawDraw.circleAt({ x = center#x + Int32.toFloat64(k) * gap, y = center#y }, dot, t#ink, zButtons())))
 
-    /// 長押しのツールチップ: 押し続けているボタンの左に、暗い札と右向きの小さな三角で名前を出す（長押しの秒に届いてから）。
-    /// 指の長押し（tip）は離した後に知らせと同じ秒だけ出す。
-    def tooltip(atlas: FontAtlas, env: Env): List[Render.PlacedItem] =
+    /// 角の丸い矩形（左上原点・角の半径 radius）の形で、上から下へ濃さが変わる color の面（地の上を明るく見せる重ね）。
+    // WhyNot: Render.vgrad を … とツールチップの地に使わない — 頂点色の矩形なので角の丸めと縁が効かず、丸い … が四角く描かれる。
+    def roundedSheen(size: Vec2.Vec2, radius: Float64, color: Color, alpha: { top = Float64, bottom = Float64 }, z: Int32): Render.Item =
+        let r = Float64.min(radius, Float64.min(size#x, size#y) / 2.0);
+        let arc = (cx, cy, startDeg) -> List.range(0, 7) |> List.map(k -> {
+            let a = (startDeg + Int32.toFloat64(k) * 15.0) * Num.pi() / 180.0;
+            { x = cx + r * Num.cos(a), y = cy + r * Num.sin(a) }
+        });
+        let outline = List.flatten(arc(size#x - r, r, 270.0) :: arc(size#x - r, size#y - r, 0.0) :: arc(r, size#y - r, 90.0) :: arc(r, r, 180.0) :: Nil);
+        Render.gradPolygon(outline |> List.map(p -> { pos = p, color = color, alpha = alpha#top + (alpha#bottom - alpha#top) * p#y / size#y }), z)
+
+    /// 長押しのツールチップ: 押し続けているボタンの左に、暗い地と右向きの小さな三角で名前を出す（長押しの秒に届いてから）。
+    /// 指の長押し（Read の tip）は離した後に知らせと同じ秒だけ出す。
+    def tooltip(atlas: FontAtlas, env: Env, r: World.Read): List[Render.PlacedItem] =
         let all = WorldMenu.buttonsOf(env#fit);
-        let long = PortraitDoc.rec(env#res#portrait)#holdSeconds;
-        let tipped = env#tip |> Option.filter(match (_, at) -> Clock.since(at, env#realNow) < kindOf(env)#toastSeconds) |> Option.map(fst);
+        let tipped = World.tipOf(env#res, env#realNow, r);
         let pressed = match env#grab {
-            case World.Grab.Hold(i, held) if held >= long => Some(i)
-            case _                                        => tipped
+            case World.Grab.LongPress(i, since) if Rail.isLong(env#fit, Clock.since(since, env#realNow)) => Some(i)
+            case _                                                                                       => tipped
         };
         pressed |> Option.flatMap(i -> List.nth(i, all) |> Option.map(b -> (i, b)))
-            |> Option.filter(match (_, b) -> WorldMenu.longPressOf(b) == WorldMenu.LongPress.Tooltip)
-            |> Option.map(match (i, b) -> tooltipPlate(atlas, env, Layout.tooltipAnchor(env#fit, i), label(buttonLabel(b), env)))
+            |> Option.filter(match (_, b) -> WorldMenu.longPressOf(b) == WorldMenu.LongPressAction.Tooltip)
+            |> Option.map(match (i, b) -> tooltipPlate(atlas, env, Rail.tooltipAnchor(env#fit, i), label(buttonLabel(b), env)))
             |> Option.getWithDefault(Nil)
 
+    /// ツールチップの地（上がわずかに明るい暗い角丸の地・差し色の細い縁）と、ボタンを指す右向きの三角と、名前の字。
     def tooltipPlate(atlas: FontAtlas, env: Env, anchor: Vec2.Vec2, word: String): List[Render.PlacedItem] =
         let t = theme(env);
-        let size = Layout.tooltipTextSize(env#fit);
+        let size = Rail.tooltipTextSize(env#fit);
         let padX = 14.0;
         let h = size + 18.0;
         let w = TextDraw.width(word, atlas, size) + 2.0 * padX;
@@ -468,6 +536,7 @@ mod View {
         let ground = Color.darken(t#panel, 0.2);
         at(left, top, RawDraw.box({ x = w, y = h }, ground, zButtons() + 4) |> Render.fade(0.92)
                           |> Render.outlineA({ color = t#accent, alpha = 0.45, width = 1.0 }) |> Render.rounded(8.0))
+        :: at(left, top, roundedSheen({ x = w, y = h }, 8.0, t#ink, { top = 0.08, bottom = 0.0 }, zButtons() + 4))
         :: at(0.0, 0.0, RawDraw.polygon(List#{{ x = anchor#x - 8.5, y = anchor#y - 6.0 }, { x = anchor#x, y = anchor#y }, { x = anchor#x - 8.5, y = anchor#y + 6.0 }},
                                         ground, zButtons() + 4) |> Render.fade(0.92))
         :: textIn({ position = { x = left, y = top }, size = { x = w, y = h } }, word, atlas, size, t#ink, zButtons() + 5) :: Nil
@@ -493,14 +562,14 @@ mod View {
             else ((7.0, 5.0) :: (18.0, 12.0) :: (7.0, 19.0) :: (7.0, 5.0) :: Nil) :: Nil
         case World.Button.Log  =>
             ((5.0, 6.0) :: (19.0, 6.0) :: Nil) :: ((5.0, 11.0) :: (19.0, 11.0) :: Nil) :: ((5.0, 16.0) :: (14.0, 16.0) :: Nil) :: Nil
-        case World.Button.Bookmark =>
-            // WhyNot: 紙の幅を広くしない — 幅の広い札はブックマークの旗の形に読める。紐と房でしおりと分かる。
+        case World.Button.SaveLoad =>
+            // WhyNot: 紙の幅を広くしない — 幅の広い紙はブックマークの旗の形に読める。紐と房でしおりと分かる。
             ((7.5, 7.0) :: (16.5, 7.0) :: (16.5, 22.0) :: (12.0, 18.0) :: (7.5, 22.0) :: (7.5, 7.0) :: Nil)
             :: ((12.0, 7.0) :: (12.0, 3.6) :: Nil) :: ((12.0, 3.6) :: (9.4, 1.2) :: Nil) :: ((12.0, 3.6) :: (14.6, 1.2) :: Nil) :: Nil
         case _ => Nil
     }
 
-    // ── 縦の画面の … のメニューとしおりのメニュー ──
+    // ── 縦の画面の … のメニューとしおりの選び ──
 
     /// 小さなメニューの下に敷く物: 画面を薄く沈める幕と、box の地（上から下へ少し暗くなる・差し色の細い縁）。
     def popupGround(env: Env, box: Rect2.Rect2): List[Render.PlacedItem] =
@@ -521,26 +590,26 @@ mod View {
     def menuPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
         let items = WorldMenu.menuItems();
         let rows = items |> List.zipWithIndex |> List.flatMap(match (i, item) -> {
-            let r = Layout.menuItem(env#fit, i);
+            let r = Rail.menuItem(env#fit, i);
             popupItem(atlas, env, r, item, i == cursor or isOver(r, env))
         });
-        List.append(popupGround(env, Layout.menuBox(env#fit, List.length(items))), rows)
+        List.append(popupGround(env, Rail.menuBox(env#fit, List.length(items))), rows)
 
-    /// しおりのボタンから開く小さなメニュー: …のメニューと同じ地と縁で、しおりの左に [セーブ｜ロード] を横に並べ、間に細い線。
-    def bookmarkPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
+    /// しおりのボタンから開く選び: … のメニューと同じ地と縁で、しおりの左に [セーブ｜ロード] を横に並べ、間に細い線。
+    def saveLoadPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
         let t = theme(env);
-        let items = WorldMenu.bookmarkItems();
+        let items = WorldMenu.saveLoadItems();
         let count = List.length(items);
         let dividers = List.range(1, count) |> List.map(i -> {
-            let r = Layout.bookmarkItem(env#fit, i, count);
+            let r = Rail.saveLoadItem(env#fit, i, count);
             RawDraw.lineSeg({ x = r#position#x, y = r#position#y + 14.0 }, { x = r#position#x, y = r#position#y + r#size#y - 14.0 },
                             1.0, Color.mix(t#ink, t#panel, 0.6), zPanel() + 2)
         });
         let cells = items |> List.zipWithIndex |> List.flatMap(match (i, item) -> {
-            let r = Layout.bookmarkItem(env#fit, i, count);
+            let r = Rail.saveLoadItem(env#fit, i, count);
             popupItem(atlas, env, r, item, i == cursor or isOver(r, env))
         });
-        List.flatten(popupGround(env, Layout.bookmarkBox(env#fit, count)) :: dividers :: cells :: Nil)
+        List.flatten(popupGround(env, Rail.saveLoadBox(env#fit, count)) :: dividers :: cells :: Nil)
 
     /// 小さなメニューの項目の言葉（… の「タイトルへ」だけ、下の帯の「タイトル」と言葉を分ける）。
     def menuLabel(item: World.Button): StoryDoc.Label = match item {
@@ -606,7 +675,7 @@ mod View {
         case World.Button.Hide      => StoryDoc.Label.Hide
         case World.Button.ToTitle   => StoryDoc.Label.ToTitle
         case World.Button.Menu      => StoryDoc.Label.Menu
-        case World.Button.Bookmark  => StoryDoc.Label.Bookmark
+        case World.Button.SaveLoad  => StoryDoc.Label.SaveLoad
     }
 
     // ── タイトル ──
@@ -615,7 +684,7 @@ mod View {
         let t = theme(env);
         let s = StoryDoc.rec(env#res#story);
         let center = Layout.width(env#fit) / 2.0;
-        let shade = portraitVeil(env, Stage.TextPos.Mid);
+        let shade = portraitVeil(env, Stage.TextPos.Mid, 1.0);
         let fit = env#fit;
         let heading = TextDraw.centered({ text = s#title, atlas = atlas, size = 84.0, color = t#ink, z = zText(), centerX = center, y = Layout.titleHeadingY(fit) });
         let sub = if (String.isEmpty(s#subtitle)) Nil
@@ -682,7 +751,7 @@ mod View {
                 slotsPanel(atlas, env, StoryDoc.Label.LoadTitle, { tabs = Saves.tabs(), tab = tab, cursor = i }, screenOf)
             case World.Panel.Settings(at)      => settingsPanel(atlas, env, at)
             case World.Panel.Menu(cursor)      => menuPanel(atlas, env, cursor)
-            case World.Panel.Bookmark(cursor)  => bookmarkPanel(atlas, env, cursor)
+            case World.Panel.SaveLoadPick(cursor) => saveLoadPanel(atlas, env, cursor)
         }
 
     /// 画面の地・左上の見出しと下の線・右上の「戻る」・下の案内（空なら出さない）。
@@ -892,14 +961,14 @@ mod View {
         // WhyNot: 背景を揺れの分はみ出す backdropRect で塗らない —— 写真の面（Shader）は切り抜き（clippedAll）が効かず、枠の外へはみ出す。
         let whole = Layout.screen(env#fit);
         let shown = screen |> Option.map(read ->
-            List.flatten(backdropsIn(whole, away, read#stage) :: particles(away, read#stage) :: reading(atlas, away, read) :: Nil))
+            List.flatten(backdropsIn(whole, away, read#stage) :: particles(away, read#stage) :: castLayer(away, read#stage) :: reading(atlas, away, read) :: Nil))
             |> Option.getWithDefault(Nil);
         let k = Float64.min(r#size#x / Layout.width(env#fit), r#size#y / Layout.height(env#fit));
         let small = shown |> Render.scaledAllAround(k, { x = 0.0, y = 0.0 }) |> Render.movedAll(r#position)
             |> List.map(Render.overItem(liftedZ(zThumb()))) |> Render.clippedAll(r);
-        // 写真がまだ届いていない枠は、暗い地（backdropsIn が写真を描かない）の右下に待ちの印。
+        // 写真がまだ届いていない枠は、暗い地（backdropsIn が写真を描かない）に待ちの印。
         let photoMissing = screen |> Option.exists(read -> stagePhotoMissing(env, read#stage));
-        let mark = if (photoMissing) waitDots(env, { x = r#position#x + r#size#x - 30.0, y = r#position#y + r#size#y - 12.0 }, 0.6, zThumbTop() + 1) else Nil;
+        let mark = if (photoMissing) loadingMark(atlas, env, t#loadingMark, r, { x = 30.0, y = 12.0 }, 0.6, zThumbTop() + 1) else Nil;
         List.flatten(small :: frameOf(r, Color.mix(t#ink, t#panel, 0.6), zThumbTop()) :: mark :: Nil)
 
     /// 舞台の写真が、まだ届いていない後回しの絵か。

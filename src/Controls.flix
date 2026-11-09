@@ -43,23 +43,30 @@ mod Controls {
     def interpret(res: Res.Res, frame: App.Frame, w0: World.World): World.World \ Emit[World.Event] =
         // WhyNot: 他の画面で押し始めた押しを持ち越さない — 画面を閉じた押しを読む画面で離すと、タップと見なされて台詞が進む。
         let w = if (readsText(w0) or Gesture.isIdle(w0#gesture)) w0 else dropGesture(w0);
-        if (Option.nonEmpty(w#ask)) askInput(res, frame, dropHold(w))
-        else if (w#panel != World.Panel.Closed) panelInput(res, frame, dropHold(w))
+        if (Option.nonEmpty(w#ask)) askInput(res, frame, dropLongPress(w))
+        else if (w#panel != World.Panel.Closed) panelInput(res, frame, dropLongPress(w))
         else match w#scene {
             case World.Scene.Title(_)      => titleInput(res, frame, w)
             // WhyNot: 素材を待つ間にメニューやセーブを開かせない — 画面は黒で押せる物が見えず、待ちは長くても数十秒で明ける。
-            case World.Scene.Reading(_)    => if (World.isHolding(w)) w else readingInput(res, frame, w)
+            case World.Scene.Reading(_)    => if (World.isHolding(w)) dropLongPress(w) else readingInput(res, frame, w)
             case World.Scene.Credits(_, _) =>
                 let k = keysOf(res);
                 if (World.creditsOver(res, Layout.height(fitOf(res, frame)), w) or frame#mouseClicked or tapped(k#confirm, frame) or tapped(k#back, frame)) World.toTitle(w)
                 else w
         }
 
+    def dropGesture(w: World.World): World.World = { gesture = Gesture.idle() | w }
+
+    /// 列の長押しの途中で画面や確認のウィンドウが開いた・素材を待つ黒に入ったら、長押しを捨てる。
+    // WhyNot: 残したまま読む間へ戻さない — 戻った最初のフレームで「離した」と読み、開いた覚えの無いボタンを押してしまう。
+    def dropLongPress(w: World.World): World.World = match w#grab {
+        case World.Grab.LongPress(_, _) => { grab = World.Grab.Free | w }
+        case _                          => w
+    }
+
     /// 入力が本文へ届く時か（確認のウィンドウも画面も開いていない・読んでいる・素材を待っていない）。
     def readsText(w: World.World): Bool =
         Option.isEmpty(w#ask) and w#panel == World.Panel.Closed and World.isReading(w) and not World.isHolding(w)
-
-    def dropGesture(w: World.World): World.World = { gesture = Gesture.idle() | w }
 
     // ── 確認のウィンドウ ──
 
@@ -96,16 +103,9 @@ mod Controls {
                 else w
         }
 
-    /// 長押しの途中で画面や確認のウィンドウが開いたら、長押しを捨てる。
-    // WhyNot: 残したまま読む間へ戻さない — 戻った最初のフレームで「離した」と読み、開いた覚えの無いボタンを押してしまう。
-    def dropHold(w: World.World): World.World = match w#grab {
-        case World.Grab.Hold(_, _) => { grab = World.Grab.Free | w }
-        case _                     => w
-    }
-
     // ── 読んでいる間 ──
 
-    /// 読む間の入口。縦の画面は右の列（長押しを数える）と右上の …、横の画面は下の帯。
+    /// 読む間の入口。縦の画面は右の列（Rail.judge）と右上の …、横の画面は下の帯。
     /// 押した 1 回は Gesture で記録し、離した時に advancesOnRelease の種類なら本文を 1 行送る（releasedText）。
     def readingInput(res: Res.Res, frame: App.Frame, w0: World.World): World.World \ Emit[World.Event] =
         let fit = fitOf(res, frame);
@@ -120,51 +120,44 @@ mod Controls {
             readingRest(res, frame, pressed, releasedText, w)
         }
 
-    /// 縦の画面: 右の列のボタンは押し始めで長押しを数え始め、離した時に押したことにする（holdButton）。… は押した時に開く。
-    /// 列のボタンが受けた押しは Gesture の記録を捨てる（列を押して離した時に、本文のタップとして台詞まで進めない）。
-    def railInput(res: Res.Res, frame: App.Frame, fit: Layout.Fit, releasedText: Bool, w0: World.World): World.World \ Emit[World.Event] =
+    /// 縦の画面: 右の列のボタンは押し始めで掴み、離した時に押したことにする。長押しは WorldMenu.longPressOf のとおり。… は押した時に開く。
+    /// 列か … が受けた押しは Gesture の記録を捨てる（列を押して離した時に、本文のタップとして台詞まで進めない）。
+    def railInput(res: Res.Res, frame: App.Frame, fit: Layout.Fit, releasedText: Bool, w: World.World): World.World \ Emit[World.Event] =
         let buttons = WorldMenu.buttonsOf(fit);
-        let onRail = Layout.hitOf(List.length(buttons), i -> Layout.button(fit, i, List.length(buttons)), frame#cursor);
-        let overMore = Layout.contains(Layout.moreButton(fit)#hit, frame#cursor);
-        let onMore = frame#mouseClicked and overMore;
-        let touchLong = not frame#mouseDown and not frame#mouseClicked and tapped(keysOf(res)#back, frame);
-        let w = dropGesture(w0);
-        match (w#grab, onRail) {
-            case (World.Grab.Hold(i, held), _) =>
-                List.nth(i, buttons) |> Option.map(b -> holdButton(res, frame, b, i, held, w)) |> Option.getWithDefault({ grab = World.Grab.Free | w })
-            case (_, Some(i)) if frame#mouseClicked => { grab = World.Grab.Hold(i, 0.0) | w }
-            case (_, Some(i)) if touchLong => List.nth(i, buttons) |> Option.map(b -> touchLongPress(res, frame, b, i, w)) |> Option.getWithDefault(w)
-            // WhyNot: … の上の指の長押しで隠すにしない — … を押そうとした指で、文章のウィンドウが消える。
-            case _ if touchLong and overMore => w
-            case _ => readingRest(res, frame, if (onMore) Some(World.Button.Menu) else None, releasedText, w0)
+        let input = Rail.inputOf(frame, tapped(keysOf(res)#touchHold, frame));
+        let dropped = dropGesture(w);
+        let freed = { grab = World.Grab.Free | dropped };
+        let buttonAt = (i, f) -> List.nth(i, buttons) |> Option.map(f) |> Option.getWithDefault(freed);
+        match Rail.judge(fit, input, w#grab, frame#realNow) {
+            case Rail.Outcome.Begin(i)     => { grab = World.Grab.LongPress(i, frame#realNow) | dropped }
+            case Rail.Outcome.Held(_)      => dropped
+            case Rail.Outcome.Tap(i)       => buttonAt(i, b -> WorldMenu.tapRail(res, b, freed))
+            case Rail.Outcome.Long(i)      => buttonAt(i, b -> longPress(res, b, dropped))
+            case Rail.Outcome.Released     => freed
+            case Rail.Outcome.TouchLong(i) => buttonAt(i, b -> touchLongPress(res, frame, b, i, dropped))
+            case Rail.Outcome.MoreOpen     => WorldMenu.press(res, World.Button.Menu, dropped)
+            case Rail.Outcome.Swallow      => dropped
+            case Rail.Outcome.Pass         => readingRest(res, frame, None, releasedText, w)
         }
 
-    /// ブラウザ版の指の長押し（離した時に touchGestures の longPress = 戻るのキーが、押した所のまま届く）が右の列の上だった:
+    /// 押したまま長押しの秒を越えている列のボタン: ツールチップの物は離すまで掴んだまま（離しても押さない）、
+    /// 別のボタンになる物（オート → スキップ）はそのボタンを押して掴みを Other にする（離しても押さない・続けて押さない）。
+    def longPress(res: Res.Res, button: World.Button, w: World.World): World.World \ Emit[World.Event] =
+        match WorldMenu.longPressOf(button) {
+            case WorldMenu.LongPressAction.Press(other) => WorldMenu.press(res, other, { grab = World.Grab.Other | w })
+            case WorldMenu.LongPressAction.Tooltip      => w
+        }
+
+    /// ブラウザ版の指の長押し（離した時に touchGestures の longPress = touchHold のキーが、押した所のまま届く）が右の列の上だった:
     /// マウスの長押しと同じく、オートはスキップ、ほかは名前のツールチップ（離した後に出す）。
-    // WhyNot: 戻るのキーのまま隠すにしない — ブラウザの指は置いている間に押しを出さないので、列の長押しが全部ウィンドウを隠すになる。
     def touchLongPress(res: Res.Res, frame: App.Frame, button: World.Button, i: Int32, w: World.World): World.World \ Emit[World.Event] =
         match WorldMenu.longPressOf(button) {
-            case WorldMenu.LongPress.Press(other) => WorldMenu.press(res, other, w)
-            case WorldMenu.LongPress.Tooltip      => { tip = Some((i, frame#realNow)) | w }
-        }
-
-    /// 押し続けている列のボタン: 長押しの秒に届く前に離したら押したことにする。届いたら WorldMenu.longPressOf のとおり、
-    /// ツールチップを出したまま離すまで待つ（離しても押さない）か、別のボタンを押したことにする（オート → スキップ）。
-    def holdButton(res: Res.Res, frame: App.Frame, button: World.Button, i: Int32, held: Float64, w: World.World): World.World \ Emit[World.Event] =
-        let long = PortraitDoc.rec(res#portrait)#holdSeconds;
-        let next = held + frame#dt;
-        if (not frame#mouseDown) {
-            let freed = { grab = World.Grab.Free | w };
-            if (held < long) WorldMenu.tapRail(res, button, freed) else freed
-        }
-        else if (next < long) { grab = World.Grab.Hold(i, next) | w }
-        else match WorldMenu.longPressOf(button) {
-            case WorldMenu.LongPress.Press(other) => WorldMenu.press(res, other, { grab = World.Grab.Other | w })
-            case WorldMenu.LongPress.Tooltip      => { grab = World.Grab.Hold(i, next) | w }
+            case WorldMenu.LongPressAction.Press(other) => WorldMenu.press(res, other, w)
+            case WorldMenu.LongPressAction.Tooltip      => World.mapRead(r -> { tip = Some((i, frame#realNow)) | r }, w)
         }
 
     /// 押したボタン（無ければキー・選択肢・送り）。送るのは離した押し（releasedText）とキーの決定だけで、
-    /// ボタン・キー・選択肢が受けた押しは Gesture の記録を捨てる。
+    /// ボタン・キー・選択肢が受けた押しは Gesture の記録を捨てる。指の長押し（touchHold）は列の外なら隠す。
     def readingRest(res: Res.Res, frame: App.Frame, pressed: Option[World.Button], releasedText: Bool, w0: World.World): World.World \ Emit[World.Event] =
         let k = keysOf(res);
         let w = if (w0#grab != World.Grab.Free and not frame#mouseDown) { grab = World.Grab.Free | w0 } else w0;
@@ -179,7 +172,7 @@ mod Controls {
                 else if (tapped(k#skip, frame)) WorldMenu.press(res, World.Button.Skip, dropped)
                 else if (tapped(k#quickSave, frame)) WorldMenu.press(res, World.Button.QuickSave, dropped)
                 else if (tapped(k#quickLoad, frame)) WorldMenu.press(res, World.Button.QuickLoad, dropped)
-                else if (tapped(k#hide, frame) or tapped(k#back, frame)) WorldMenu.press(res, World.Button.Hide, dropped)
+                else if (tapped(k#hide, frame) or tapped(k#back, frame) or tapped(k#touchHold, frame)) WorldMenu.press(res, World.Button.Hide, dropped)
                 else if (World.isChoosing(w)) choiceInput(res, frame, dropped)
                 // WhyNot: 下へのホイールで送らない — ブラウザ版は縦に動かす指をホイールの刻みに読み替えるので、指を置いたまま上へ動かすと台詞が進む。
                 else if (releasedText or tapped(k#confirm, frame) or tapped(k#advance, frame)) WorldRead.advance(res, w)
@@ -188,7 +181,7 @@ mod Controls {
 
     /// 離した押しのうち本文を 1 行送る種類: タップ・ドラッグ・左の外の払い。
     // WhyNot: 左の払いで送らない — 左へ払うのは 1 行戻る（touchGestures の swipeLeft）で、送ると戻した行へすぐ進む。
-    // WhyNot: 長押しで送らない — 長押しはウィンドウを隠す（touchGestures の longPress）。
+    // WhyNot: 長押しで送らない — 長押しはウィンドウを隠す（touchGestures の longPress = touchHold）。
     def advancesOnRelease(kind: Gesture.Kind): Bool = match kind {
         case Gesture.Kind.Tap(_)    => true
         case Gesture.Kind.Drag      => true
@@ -226,7 +219,7 @@ mod Controls {
             case World.Panel.LoadSlots(_, _) => slotsInput(res, frame, back, w)
             case World.Panel.Settings(at)    => settingsInput(res, frame, back, at, w)
             case World.Panel.Menu(at)        => menuInput(res, frame, back, at, w)
-            case World.Panel.Bookmark(at)    => bookmarkInput(res, frame, back, at, w)
+            case World.Panel.SaveLoadPick(at) => saveLoadInput(res, frame, back, at, w)
         }
 
     /// … のメニュー: 項目を押すとその項目へ、メニューの外を押すか戻るで閉じる。キーは ↑↓ と決定。
@@ -235,8 +228,8 @@ mod Controls {
         let fit = fitOf(res, frame);
         let items = WorldMenu.menuItems();
         let count = List.length(items);
-        let hovered = Layout.hitOf(count, i -> Layout.menuItem(fit, i), frame#cursor);
-        let outside = frame#mouseClicked and not Layout.contains(Layout.menuBox(fit, count), frame#cursor);
+        let hovered = Layout.hitOf(count, Rail.menuItem(fit), frame#cursor);
+        let outside = frame#mouseClicked and not Layout.contains(Rail.menuBox(fit, count), frame#cursor);
         let pickItem = i -> List.nth(i, items) |> Option.map(item -> WorldMenu.chooseMenu(res, item, w)) |> Option.getWithDefault(w);
         match hovered {
             case Some(i) if frame#mouseClicked => pickItem(i)
@@ -249,22 +242,22 @@ mod Controls {
                 else w
         }
 
-    /// しおりのメニュー: セーブ・ロードを押すとその画面へ、外を押すか戻るで閉じる。キーは ←→（↑↓ も）と決定。
-    def bookmarkInput(res: Res.Res, frame: App.Frame, back: Bool, cursor: Int32, w: World.World): World.World \ Emit[World.Event] =
+    /// しおりの選び: セーブ・ロードを押すとその画面へ、外を押すか戻るで閉じる。キーは ←→（↑↓ も）と決定。
+    def saveLoadInput(res: Res.Res, frame: App.Frame, back: Bool, cursor: Int32, w: World.World): World.World \ Emit[World.Event] =
         let k = keysOf(res);
         let fit = fitOf(res, frame);
-        let items = WorldMenu.bookmarkItems();
+        let items = WorldMenu.saveLoadItems();
         let count = List.length(items);
-        let hovered = Layout.hitOf(count, i -> Layout.bookmarkItem(fit, i, count), frame#cursor);
-        let outside = frame#mouseClicked and not Layout.contains(Layout.bookmarkBox(fit, count), frame#cursor);
-        let pickItem = i -> List.nth(i, items) |> Option.map(item -> WorldMenu.chooseBookmark(res, item, w)) |> Option.getWithDefault(w);
+        let hovered = Layout.hitOf(count, i -> Rail.saveLoadItem(fit, i, count), frame#cursor);
+        let outside = frame#mouseClicked and not Layout.contains(Rail.saveLoadBox(fit, count), frame#cursor);
+        let pickItem = i -> List.nth(i, items) |> Option.map(item -> WorldMenu.chooseSaveLoad(res, item, w)) |> Option.getWithDefault(w);
         match hovered {
             case Some(i) if frame#mouseClicked => pickItem(i)
-            case Some(i) if frame#mouseMoved   => WorldMenu.pointBookmark(i, w)
+            case Some(i) if frame#mouseMoved   => WorldMenu.pointSaveLoad(i, w)
             case _ =>
                 if (back or outside or tapped(k#hide, frame)) World.closePanel(w)
-                else if (tapped(k#left, frame) or tapped(k#prev, frame)) WorldMenu.pointBookmark(cursor - 1, w)
-                else if (tapped(k#right, frame) or tapped(k#next, frame)) WorldMenu.pointBookmark(cursor + 1, w)
+                else if (tapped(k#left, frame) or tapped(k#prev, frame)) WorldMenu.pointSaveLoad(cursor - 1, w)
+                else if (tapped(k#right, frame) or tapped(k#next, frame)) WorldMenu.pointSaveLoad(cursor + 1, w)
                 else if (tapped(k#confirm, frame)) pickItem(cursor)
                 else w
         }
@@ -319,6 +312,8 @@ mod Controls {
     /// スライダーの帯をクリックするとその位置の値、2 つから選ぶ行はクリックした側になる。
     /// スライダーは押したまま（指なら横へなぞったまま）動かすと、帯の上の位置に付いて値が動く。
     /// 離すまでは最初に掴んだスライダーだけが動く（縦にずれて隣の行に入っても、隣は動かさない）。
+    // WhyNot: 押しているフレームならいつでも掴む、にしない — 前の画面のボタンを押したまま設定が開くと、
+    //   その指の下のスライダーのバーを掴んで値が勝手に動き、押していないのに返事の音が鳴る。掴むのは押し始めたフレームだけ。
     def settingsInput(res: Res.Res, frame: App.Frame, back: Bool, current: World.Setting, w: World.World): World.World \ Emit[World.Event] =
         let rows = WorldSettings.settings();
         let hovered = Layout.hitOf(List.length(rows), Layout.settingRow(fitOf(res, frame)), frame#cursor)
@@ -331,7 +326,7 @@ mod Controls {
                     case Some(World.Setting.Slider(slider)) => grabbed(i, slider)
                     case _                                  => w
                 }
-            case (true, World.Grab.Free, Some((i, World.Setting.Slider(slider)))) if Layout.contains(Layout.settingBarReach(fit, i), frame#cursor) =>
+            case (true, World.Grab.Free, Some((i, World.Setting.Slider(slider)))) if frame#mouseClicked and Layout.contains(Layout.settingBarReach(fit, i), frame#cursor) =>
                 grabbed(i, slider)
             case _ =>
                 let next = if (frame#mouseDown) World.Grab.Other else World.Grab.Free;
@@ -457,10 +452,15 @@ mod Controls {
           credits = CreditsDoc.load(CreditsDoc.path()),
           keys = KeysDoc.load(KeysDoc.path()),
           smallScreen = SmallScreenDoc.load(SmallScreenDoc.path()),
-          portrait = PortraitDoc.load(PortraitDoc.path()),
+          portrait = loadPortrait(),
+          cast = CastDoc.load(CastDoc.path()),
           mixer = AudioMixerDoc.load(AudioMixer.defaults(), mixerPath()),
           dialogue = Talk.load(),
           missing = Set.empty() }
+
+    /// 縦の画面の Doc（novel.portrait.json に novel.rail.json を rail 欄として組んだ物）。
+    def loadPortrait(): PortraitDoc.Doc \ Fs.FileRead =
+        PortraitDoc.withRail(RailDoc.load(RailDoc.path()), PortraitDoc.load(PortraitDoc.path()))
 
     /// Doc の一覧表(DocTable)。watchFile(保存即反映)・F1 の一括リロード・Studio へ名乗る「表示中」の 3 つは、
     /// どれもこの 1 枚から導出する。docId は project.json の editor.resources[] の id と同じ物。
@@ -477,7 +477,9 @@ mod Controls {
                 |> DocTable.withActiveWhen(Resources.read((_, w) -> World.isCredits(w))))
             :: Resources.reloadRow("keys", KeysDoc.path(), res -> Res.withKeys(KeysDoc.load(KeysDoc.path()), res), unchanged)
             :: Resources.reloadRow("small", SmallScreenDoc.path(), res -> Res.withSmallScreen(SmallScreenDoc.load(SmallScreenDoc.path()), res), unchanged)
-            :: Resources.reloadRow("portrait", PortraitDoc.path(), res -> Res.withPortrait(PortraitDoc.load(PortraitDoc.path()), res), unchanged)
+            :: Resources.reloadRow("portrait", PortraitDoc.path(), res -> Res.withPortrait(loadPortrait(), res), unchanged)
+            :: Resources.reloadRow("rail", RailDoc.path(), res -> Res.withPortrait(loadPortrait(), res), unchanged)
+            :: Resources.reloadRow("cast", CastDoc.path(), res -> Res.withCast(CastDoc.load(CastDoc.path()), res), unchanged)
             :: Resources.reloadRow("mixer", mixerPath(), res -> Res.withMixer(AudioMixerDoc.load(AudioMixer.defaults(), mixerPath()), res), unchanged)
             :: Nil
 }
