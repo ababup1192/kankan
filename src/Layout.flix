@@ -134,7 +134,12 @@ mod Layout {
             case Stage.TextPos.Mid    => (h * 0.38, bottom)
             case Stage.TextPos.Bottom => (h * 0.57, bottom)
         };
-        rect(full#position#x, top, full#size#x, Float64.max(0.0, end - top))
+        // WhyNot: 真ん中と下の頁は列の左で抑えない — 列は上に積むので、その高さまで届かない。
+        let right = match pos {
+            case Stage.TextPos.Top => full#position#x + full#size#x
+            case _                 => width(fit) - margin() - 16.0
+        };
+        rect(full#position#x, top, right - full#position#x, Float64.max(0.0, end - top))
 
     /// 縦の画面の頁で、行と行の間の空き。
     pub def paragraphGap(): Float64 = 26.0
