@@ -13,7 +13,7 @@ mod Shots {
 
     /// 描き出せる場面の名前（make render の SHOT とギャラリーの並びの正）。
     pub def names(): List[String] =
-        "title" :: "nvl" :: "woman" :: "face" :: "phone" :: "log" :: "save" :: "load" :: "settings" :: "ask" :: "credits" :: Nil
+        "title" :: "nvl" :: "woman" :: "face" :: "phone" :: "hold" :: "log" :: "save" :: "load" :: "settings" :: "ask" :: "credits" :: Nil
 
     /// 名前 → 描き出しと同じ初めの World（initialOf）から組んだ場面の World。
     pub def worldOf(name: String, res: Res.Res): Option[World.World] = sceneOf(res, name, initialOf(res))
@@ -26,6 +26,8 @@ mod Shots {
             case "woman"    => Some(at(4.0, nthLine(res, "Woman", 1, w0)))
             case "face"     => Some(at(4.0, nthLine(res, "Face", 1, w0)))
             case "phone"    => Some(at(4.0, nthLine(res, "Call", 1, w0)))
+            // 素材の待ち: ブラウザ版で次の写真がまだ届かず、黒のまま待っている所（右下に待ちの印）。
+            case "hold"     => Some(at(4.0, holding(res, nthLine(res, "Opening", 1, w0))))
             case "log"      =>
                 let w = quiet(() -> WorldLog.openLog(readThrough(res, w0)));
                 Some(at(4.0, { pointer = { x = 270.0, y = 300.0 } | w }))
@@ -37,6 +39,13 @@ mod Shots {
             case "credits"  => Some(at(12.0, World.toCredits(res, w0)))
             case _          => None
         }
+
+    /// 次の写真（寝室）を黒のまま待ち続けている形（待ちの印が出る長さだけ待った所）。
+    def holding(res: Res.Res, w: World.World): World.World =
+        let names = BackdropDoc.textureOf("bedroom", res#backdrops) |> Option.toList;
+        let hold = { phase = World.HoldPhase.Waiting, phaseFrom = World.now(w), waited = KindDoc.rec(res#kind)#holdMarkSeconds + 1.0,
+                     names = names, rest = Nil, last = None };
+        World.mapRead(r -> { hold = Some(hold) | r }, w)
 
     /// 物語の時計と実時間の今を、どちらも seconds 秒に据える。
     def at(seconds: Float64, w: World.World): World.World =
@@ -77,7 +86,7 @@ mod Shots {
     /// <<wait>> を明かす（描き出しは時計を進めないので、明ける時刻で 1 歩だけ流す）。
     def settleWait(res: Res.Res, w: World.World): World.World =
         match World.readOf(w) |> Option.flatMap(r -> YarnRunner.waitUntilOf(r#talk)) {
-            case Some(until) => quiet(() -> WorldRead.step(res, { storyClock = Clock.startAt(Clock.secondsOf(until)) | w }))
+            case Some(until) => quiet(() -> WorldRead.step(res, 0.0, { storyClock = Clock.startAt(Clock.secondsOf(until)) | w }))
             case None        => w
         }
 }

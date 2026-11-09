@@ -10,6 +10,7 @@
 // ── 画面の層（奥から手前へ）──
 //   world: 前の背景（重ねている間だけ）→ 今の背景（進みで現れる）→ パーティクル（蛍）   … 揺れはこの層だけに掛かる
 //   hud:   NVL の幕 / ADV のウィンドウ → 本文（ルビつき）・名前 → 送りの印 → 選択肢 → クイックメニュー
+//          → 素材を待つ間の黒と待ちの印（ブラウザ版で背景・環境音がまだ届いていない時）
 //          → 画面（バックログ・セーブ・ロード・設定。セーブの枠のサムネはその時の画面を同じ関数で描いて縮める）→ 確認のウィンドウ → 知らせ
 //          タイトルとクレジットも hud（写真の上に字だけを置く画面）
 //
@@ -24,18 +25,19 @@ mod View {
     use fge::{App, Clock, Color, DrawCmd, FontAtlas, Fx, Num, RawDraw, Rect2, Render, RichText, ShaderDoc, TextDraw, UiScroll, Vec2}
 
     /// どの場面でも使う描く元: Doc とシナリオ（res）・セーブデータ（既読と設定と枠）・マウスの位置・2 本の時計の今・
-    /// 並べ方の組（fit。Controls が当たりを取る時と同じ組）。
+    /// 並べ方の組（fit。Controls が当たりを取る時と同じ組）・押している間の掴み（grab。長押しのツールチップ）。
     pub type alias Env = {
         res = Res.Res,
         saves = Saves.Saves,
         pointer = { x = Float64, y = Float64 },
+        grab = World.Grab,
         realNow = Clock.Time[Clock.Real],
         storyNow = Clock.Time[Stage.Story],
         fit = Layout.Fit
     }
 
     pub def envOf(fit: Layout.Fit, res: Res.Res, w: World.World): Env =
-        { res = res, saves = w#saves, pointer = w#pointer, realNow = w#realNow, storyNow = World.now(w), fit = fit }
+        { res = res, saves = w#saves, pointer = w#pointer, grab = w#grab, realNow = w#realNow, storyNow = World.now(w), fit = fit }
 
     /// 描く画面の区分と design の向き・大きさから並べ方の組を選ぶ（Controls が Frame から引く組と同じ）。
     // WhyNot: ctx#visible#size を design の大きさとして読んでよいのは、このゲームが camera を使わないから（HUD は常に design 全体）。
@@ -47,6 +49,9 @@ mod View {
     def zText(): Int32 = 20
     def zChoice(): Int32 = 30
     def zButtons(): Int32 = 40
+    /// 素材を待つ間の黒（本文とボタンの上・画面と確認のウィンドウの下）と、その上の待ちの印。
+    def zHold(): Int32 = 45
+    def zHoldMark(): Int32 = 46
     def zPanel(): Int32 = 50
     def zCard(): Int32 = 52
     /// サムネの縮めた画面は zThumb + 元の z（元は 0..zButtons の少し上）に入る。縁と印は zThumbTop から。
@@ -73,6 +78,7 @@ mod View {
             case World.Panel.Closed => false
             case World.Panel.Hidden => false
             case World.Panel.Menu(_) => false
+            case World.Panel.Bookmark(_) => false
             case _                  => true
         };
         let screen = if (covered) Nil else match w#scene {
@@ -80,7 +86,8 @@ mod View {
             case World.Scene.Credits(startedAt, _) => credits(atlas, env, startedAt) |> List.map(fadeTo(Float64.min(1.0, Clock.since(startedAt, env#realNow) / 3.0)))
             case World.Scene.Reading(r)       => if (w#panel == World.Panel.Hidden) Nil else shaken(env, r, reading(atlas, env, r))
         };
-        List.flatten(screen :: panel(res, atlas, env, w) :: askLayer(atlas, env, w#ask) :: toast(atlas, env, World.toastOf(res, w)) :: Nil)
+        let holding = World.readOf(w) |> Option.flatMap(r -> r#hold) |> Option.map(holdLayer(env)) |> Option.getWithDefault(Nil);
+        List.flatten(screen :: holding :: panel(res, atlas, env, w) :: askLayer(atlas, env, w#ask) :: toast(atlas, env, World.toastOf(res, w)) :: Nil)
 
     def realSeconds(env: Env): Float64 = Clock.secondsOf(env#realNow)
 
@@ -170,10 +177,43 @@ mod View {
         let h = area#size#y * zoom;
         { position = { x = area#position#x - (w - area#size#x) / 2.0, y = area#position#y - (h - area#size#y) / 2.0 }, size = { x = w, y = h } }
 
+    /// 写真がまだ届いていなければ None（その層は描かず、下の暗い地が見える）。
     def specOf(shot: Stage.Shot, env: Env): Option[ShaderDoc.Spec] =
-        forM (photo <- BackdropDoc.photoOf(shot#photo, env#res#backdrops);
+        forM (photo <- BackdropDoc.photoOf(shot#photo, env#res#backdrops) |> Option.filter(p -> not Set.memberOf(p#texture, env#res#missing));
               grade <- BackdropDoc.gradeOf(shot#grade, env#res#backdrops))
         yield Backdrop.specOf("${shot#photo}_${shot#grade}", photo, grade)
+
+    // ── 素材の待ち（ブラウザ版で背景・環境音がまだ届いていない間の暗転） ──
+
+    /// 画面を夜の地の色で覆う（黒へ重ねる・黒のまま・黒から戻す）。黒のまま holdMarkSeconds を過ぎたら右下に待ちの印。
+    /// 重ねの進みは物語の時計（画面を開くと止まる）、印の明滅は実時間。
+    def holdLayer(env: Env): World.Hold -> List[Render.PlacedItem] = hold ->
+        let k = kindOf(env);
+        let progress = if (k#holdFadeSeconds <= 0.0) 1.0
+                       else Float64.min(1.0, Float64.max(0.0, Clock.since(hold#phaseFrom, env#storyNow) / k#holdFadeSeconds));
+        let alpha = match hold#phase {
+            case World.HoldPhase.FadingOut => progress
+            case World.HoldPhase.Waiting   => 1.0
+            case World.HoldPhase.FadingIn  => 1.0 - progress
+        };
+        let whole = Layout.screen(env#fit);
+        let veil = at(0.0, 0.0, RawDraw.box(whole#size, Backdrop.groundColor(), zHold()) |> Render.fade(alpha));
+        let marked = hold#phase == World.HoldPhase.Waiting and hold#waited >= k#holdMarkSeconds;
+        let mark = if (marked) waitDots(env, { x = Layout.width(env#fit) - 60.0, y = Layout.height(env#fit) - 36.0 }, 1.0, zHoldMark()) else Nil;
+        veil :: mark
+
+    /// 待ちの印: 金の小さな点 3 つが左から順に息をするように明滅する（蛍と同じ、芯と滲む光）。
+    /// origin = 左の点の中心、scale = 大きさの倍率（サムネは小さく）。
+    def waitDots(env: Env, origin: Vec2.Vec2, scale: Float64, z: Int32): List[Render.PlacedItem] =
+        let color = theme(env)#accent;
+        let t = realSeconds(env);
+        List.range(0, 3) |> List.flatMap(i -> {
+            let pulse = 0.5 + 0.5 * Num.sin(t * 4.2 - Int32.toFloat64(i) * 0.9);
+            let a = 0.2 + 0.8 * pulse * pulse;
+            let center = { x = origin#x + Int32.toFloat64(i) * 14.0 * scale, y = origin#y };
+            RawDraw.circleAt(center, 2.6 * scale, Color.lighten(color, 0.35), z + 1) |> Render.overItem(item -> Render.fade(a, item))
+            :: Render.glowAt(center, 9.0 * scale, color, { alpha = 0.45 * a, blend = DrawCmd.BlendMode.Add }, z)
+        })
 
     // ── パーティクル（蛍） ──
 
@@ -203,7 +243,7 @@ mod View {
     /// 読んでいる間の 1 画面。サムネも同じ関数で描く。
     def reading(atlas: FontAtlas, env: Env, r: World.Read): List[Render.PlacedItem] =
         if (Layout.isPortrait(env#fit))
-            List.flatten(portraitPage(atlas, env, r) :: choices(atlas, env, r) :: portraitButtons(env, r) :: Nil)
+            List.flatten(portraitPage(atlas, env, r) :: choices(atlas, env, r) :: portraitButtons(atlas, env, r) :: Nil)
         else List.flatten(textLayer(atlas, env, r) :: choices(atlas, env, r) :: quickMenu(atlas, env, r) :: Nil)
 
     def textLayer(atlas: FontAtlas, env: Env, r: World.Read): List[Render.PlacedItem] =
@@ -362,18 +402,19 @@ mod View {
                              { body = sizes#body, ruby = sizes#ruby }, ink#body, visible, line, env);
         List.append(name, body)
 
-    /// 縦の画面の操作の列: 頁の下の中央に、字の無い丸いアイコンを横一列。押せる所は Layout.button の矩形（44 CSS px 以上）で、
-    /// 丸はその真ん中に小さく置く。オートが動いている間は丸を差し色で塗り、線を暗くする。
-    def portraitButtons(env: Env, r: World.Read): List[Render.PlacedItem] =
+    /// 縦の画面の操作: 右端の縦の列に字の無い丸いアイコン（しおり・ログ・オート）と、右上の …。押せる所は Layout.button の正方形
+    /// （44 CSS px 以上）で、丸はその真ん中に小さく置く。オートが動いている間は丸を差し色で塗って線を暗くし ‖ にする、
+    /// スキップの間はオートの縁を差し色で太くする。長押しの間はツールチップを出す。
+    def portraitButtons(atlas: FontAtlas, env: Env, r: World.Read): List[Render.PlacedItem] =
         let t = theme(env);
         let all = WorldMenu.buttonsOf(env#fit);
         let n = List.length(all);
-        all |> List.zipWithIndex |> List.flatMap(match (i, button) -> {
+        let rail = all |> List.zipWithIndex |> List.flatMap(match (i, button) -> {
             let hit = Layout.button(env#fit, i, n);
             let icon = Layout.icon(env#fit, i, n);
             let lit = button == World.Button.Auto and r#playback == World.Playback.Auto;
-            // WhyNot: スキップ中を何も出さないままにしない — 縦の列にスキップは無く、歯車のメニューの中から止めるので、歯車の縁で見せる。
-            let skipping = button == World.Button.Menu and r#playback == World.Playback.Skip;
+            // WhyNot: スキップ中を何も出さないままにしない — 列にスキップは無く、オートの長押しで入ってオートで止めるので、オートの縁で見せる。
+            let skipping = button == World.Button.Auto and r#playback == World.Playback.Skip;
             let over = isOver(hit, env);
             let fill = if (lit) t#accent else if (over) Color.lighten(t#panel, 0.12) else t#panel;
             let line = if (lit) Color.darken(t#panel, 0.2) else t#ink;
@@ -382,12 +423,54 @@ mod View {
                           RawDraw.box({ x = d, y = d }, fill, zButtons() - 1) |> Render.fade(if (lit) 1.0 else 0.62)
                               |> Render.outlineA({ color = if (lit or skipping) t#accent else t#ink, alpha = if (skipping) 0.95 else if (over or lit) 0.5 else 0.18, width = if (skipping) 2.0 else 1.0 })
                               |> Render.rounded(icon#radius));
-            disc :: iconStrokes(button, icon#center, d, line, zButtons())
-        })
+            disc :: iconStrokes(iconPaths(button, lit), icon#center, d, line, zButtons())
+        });
+        List.flatten(rail :: moreMark(env) :: tooltip(atlas, env) :: Nil)
+
+    /// 右上の … の印（暗い半透明の丸に点 3 つ。点の間と大きさは丸の大きさに比べて決める）。
+    def moreMark(env: Env): List[Render.PlacedItem] =
+        let t = theme(env);
+        let more = Layout.moreButton(env#fit);
+        let center = more#center;
+        let gap = more#radius * 0.4;
+        let dot = more#radius * 0.12;
+        let d = more#radius * 2.0;
+        let over = isOver(more#hit, env);
+        at(center#x - more#radius, center#y - more#radius,
+           RawDraw.box({ x = d, y = d }, if (over) Color.lighten(t#panel, 0.12) else t#panel, zButtons() - 1) |> Render.fade(0.62)
+               |> Render.outlineA({ color = t#ink, alpha = if (over) 0.5 else 0.18, width = 1.0 }) |> Render.rounded(more#radius))
+        :: (List.range(-1, 2) |> List.map(k -> RawDraw.circleAt({ x = center#x + Int32.toFloat64(k) * gap, y = center#y }, dot, t#ink, zButtons())))
+
+    /// 長押しのツールチップ: 押し続けているボタンの左に、暗い札と右向きの小さな三角で名前を出す（長押しの秒に届いてから）。
+    def tooltip(atlas: FontAtlas, env: Env): List[Render.PlacedItem] =
+        let all = WorldMenu.buttonsOf(env#fit);
+        let long = PortraitDoc.rec(env#res#portrait)#holdSeconds;
+        match env#grab {
+            case World.Grab.Hold(i, held) if held >= long =>
+                List.nth(i, all) |> Option.filter(b -> WorldMenu.longPressOf(b) == WorldMenu.LongPress.Tooltip)
+                    |> Option.map(b -> tooltipPlate(atlas, env, Layout.tooltipAnchor(env#fit, i), label(buttonLabel(b), env)))
+                    |> Option.getWithDefault(Nil)
+            case _ => Nil
+        }
+
+    def tooltipPlate(atlas: FontAtlas, env: Env, anchor: Vec2.Vec2, word: String): List[Render.PlacedItem] =
+        let t = theme(env);
+        let size = Layout.tooltipTextSize(env#fit);
+        let padX = 14.0;
+        let h = size + 18.0;
+        let w = TextDraw.width(word, atlas, size) + 2.0 * padX;
+        let left = anchor#x - 8.0 - w;
+        let top = anchor#y - h / 2.0;
+        let ground = Color.darken(t#panel, 0.2);
+        at(left, top, RawDraw.box({ x = w, y = h }, ground, zButtons() + 4) |> Render.fade(0.92)
+                          |> Render.outlineA({ color = t#accent, alpha = 0.45, width = 1.0 }) |> Render.rounded(8.0))
+        :: at(0.0, 0.0, RawDraw.polygon(List#{{ x = anchor#x - 8.5, y = anchor#y - 6.0 }, { x = anchor#x, y = anchor#y }, { x = anchor#x - 8.5, y = anchor#y + 6.0 }},
+                                        ground, zButtons() + 4) |> Render.fade(0.92))
+        :: textIn({ position = { x = left, y = top }, size = { x = w, y = h } }, word, atlas, size, t#ink, zButtons() + 5) :: Nil
 
     /// アイコンの線（24 × 24 の升目で描いた線を、丸の直径 diameter に合わせて置く。線の太さは升目で 1.8）。
     /// 線の継ぎ目と端には線の太さの丸を置き、角を丸くする。
-    def iconStrokes(button: World.Button, center: Vec2.Vec2, diameter: Float64, color: Color, z: Int32): List[Render.PlacedItem] =
+    def iconStrokes(paths: List[List[(Float64, Float64)]], center: Vec2.Vec2, diameter: Float64, color: Color, z: Int32): List[Render.PlacedItem] =
         let unit = diameter * 18.0 / 34.0 / 24.0;
         let width = 1.8 * unit;
         let toScreen = (p: (Float64, Float64)) -> { let (x, y) = p; { x = center#x + (x - 12.0) * unit, y = center#y + (y - 12.0) * unit } };
@@ -396,50 +479,70 @@ mod View {
             let segs = List.zip(pts, List.drop(1, pts)) |> List.map(match (a, b) -> RawDraw.lineSeg(a, b, width, color, z));
             List.append(segs, pts |> List.map(p -> RawDraw.circleAt(p, width / 2.0, color, z)))
         };
-        iconPaths(button) |> List.flatMap(stroke)
+        paths |> List.flatMap(stroke)
 
-    /// アイコンの形（24 × 24 の升目の折れ線の束）。オート = 三角・ログ = 3 本の横線・セーブ = フロッピー・メニュー = 歯車。
-    def iconPaths(button: World.Button): List[List[(Float64, Float64)]] = match button {
-        case World.Button.Auto => ((7.0, 5.0) :: (18.0, 12.0) :: (7.0, 19.0) :: (7.0, 5.0) :: Nil) :: Nil
+    /// アイコンの形（24 × 24 の升目の折れ線の束）。しおり = 下が V 字に切れた細長い紙と紐、ログ = 3 本の横線、
+    /// オート = 三角（動いている間 on は ‖）。
+    def iconPaths(button: World.Button, on: Bool): List[List[(Float64, Float64)]] = match button {
+        case World.Button.Auto =>
+            if (on) ((9.0, 6.0) :: (9.0, 18.0) :: Nil) :: ((15.0, 6.0) :: (15.0, 18.0) :: Nil) :: Nil
+            else ((7.0, 5.0) :: (18.0, 12.0) :: (7.0, 19.0) :: (7.0, 5.0) :: Nil) :: Nil
         case World.Button.Log  =>
             ((5.0, 6.0) :: (19.0, 6.0) :: Nil) :: ((5.0, 11.0) :: (19.0, 11.0) :: Nil) :: ((5.0, 16.0) :: (14.0, 16.0) :: Nil) :: Nil
-        case World.Button.Save =>
-            ((6.0, 4.0) :: (16.0, 4.0) :: (19.0, 7.0) :: (19.0, 20.0) :: (6.0, 20.0) :: (6.0, 4.0) :: Nil)
-            :: ((9.0, 4.0) :: (9.0, 9.0) :: (15.0, 9.0) :: (15.0, 4.0) :: Nil)
-            :: ((9.0, 20.0) :: (9.0, 14.0) :: (16.0, 14.0) :: (16.0, 20.0) :: Nil) :: Nil
-        case World.Button.Menu =>
-            let ring = List.range(0, 13) |> List.map(k -> {
-                let a = Int32.toFloat64(k) * 2.0 * Num.pi() / 12.0;
-                (12.0 + 3.0 * Num.cos(a), 12.0 + 3.0 * Num.sin(a))
-            });
-            ring :: ((12.0, 3.0) :: (12.0, 6.0) :: Nil) :: ((12.0, 18.0) :: (12.0, 21.0) :: Nil)
-                 :: ((3.0, 12.0) :: (6.0, 12.0) :: Nil) :: ((18.0, 12.0) :: (21.0, 12.0) :: Nil)
-                 :: ((5.6, 5.6) :: (7.7, 7.7) :: Nil) :: ((16.3, 16.3) :: (18.4, 18.4) :: Nil)
-                 :: ((5.6, 18.4) :: (7.7, 16.3) :: Nil) :: ((16.3, 7.7) :: (18.4, 5.6) :: Nil) :: Nil
+        case World.Button.Bookmark =>
+            // WhyNot: 紙の幅を広くしない — 幅の広い札はブックマークの旗の形に読める。紐と房でしおりと分かる。
+            ((7.5, 7.0) :: (16.5, 7.0) :: (16.5, 22.0) :: (12.0, 18.0) :: (7.5, 22.0) :: (7.5, 7.0) :: Nil)
+            :: ((12.0, 7.0) :: (12.0, 3.6) :: Nil) :: ((12.0, 3.6) :: (9.4, 1.2) :: Nil) :: ((12.0, 3.6) :: (14.6, 1.2) :: Nil) :: Nil
         case _ => Nil
     }
 
-    // ── 縦の画面の歯車のメニュー ──
+    // ── 縦の画面の … のメニューとしおりのメニュー ──
 
-    /// 歯車から開く小さなメニュー: 頁を薄く沈め、操作の列の上に項目を縦に並べる。カーソル（または触れている）項目を明るくする。
-    def menuPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
+    /// 小さなメニューの下に敷く物: 画面を薄く沈める幕と、box の地（上から下へ少し暗くなる・差し色の細い縁）。
+    def popupGround(env: Env, box: Rect2.Rect2): List[Render.PlacedItem] =
         let t = theme(env);
+        at(0.0, 0.0, RawDraw.box(Layout.size(env#fit), Color.darken(t#panel, 0.4), zPanel()) |> Render.fade(0.35))
+        :: at(box#position#x, box#position#y,
+              Render.vgrad(box#size, { top = Color.lighten(t#panel, 0.05), bottom = t#panel }, zPanel() + 1) |> Render.fade(0.94)
+                  |> Render.outlineA({ color = t#accent, alpha = 0.45, width = 1.0 }) |> Render.rounded(10.0)) :: Nil
+
+    /// 小さなメニューの 1 項目の字（カーソル・触れている項目は板を敷いて差し色の字）。
+    def popupItem(atlas: FontAtlas, env: Env, r: Rect2.Rect2, item: World.Button, lit: Bool): List[Render.PlacedItem] =
+        let t = theme(env);
+        let inset = { position = { x = r#position#x + 4.0, y = r#position#y + 4.0 }, size = { x = r#size#x - 8.0, y = r#size#y - 8.0 } };
+        let mark = if (lit) plate(inset, true, env, zPanel() + 2) :: Nil else Nil;
+        textIn(r, label(menuLabel(item), env), atlas, Layout.menuItemTextSize(env#fit), if (lit) t#accent else t#ink, zPanelText()) :: mark
+
+    /// … から開く小さなメニュー: 画面を薄く沈め、… の下に項目を縦に並べる。
+    def menuPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
         let items = WorldMenu.menuItems();
-        let count = List.length(items);
-        let buttons = List.length(WorldMenu.buttonsOf(env#fit));
-        let box = Layout.menuBox(env#fit, count, buttons);
-        let shade = at(0.0, 0.0, RawDraw.box(Layout.size(env#fit), Color.darken(t#panel, 0.4), zPanel()) |> Render.fade(0.35));
-        let ground = at(box#position#x, box#position#y,
-                        Render.vgrad(box#size, { top = Color.lighten(t#panel, 0.05), bottom = t#panel }, zPanel() + 1) |> Render.fade(0.94)
-                            |> Render.outlineA({ color = t#accent, alpha = 0.45, width = 1.0 }) |> Render.rounded(10.0));
         let rows = items |> List.zipWithIndex |> List.flatMap(match (i, item) -> {
-            let r = Layout.menuItem(env#fit, i, count, buttons);
-            let lit = i == cursor or isOver(r, env);
-            let inset = { position = { x = r#position#x + 4.0, y = r#position#y + 4.0 }, size = { x = r#size#x - 8.0, y = r#size#y - 8.0 } };
-            let mark = if (lit) plate(inset, true, env, zPanel() + 2) :: Nil else Nil;
-            textIn(r, label(buttonLabel(item), env), atlas, Layout.menuItemTextSize(env#fit), if (lit) t#accent else t#ink, zPanelText()) :: mark
+            let r = Layout.menuItem(env#fit, i);
+            popupItem(atlas, env, r, item, i == cursor or isOver(r, env))
         });
-        shade :: ground :: rows
+        List.append(popupGround(env, Layout.menuBox(env#fit, List.length(items))), rows)
+
+    /// しおりのボタンから開く小さなメニュー: …のメニューと同じ地と縁で、しおりの左に [セーブ｜ロード] を横に並べ、間に細い線。
+    def bookmarkPanel(atlas: FontAtlas, env: Env, cursor: Int32): List[Render.PlacedItem] =
+        let t = theme(env);
+        let items = WorldMenu.bookmarkItems();
+        let count = List.length(items);
+        let dividers = List.range(1, count) |> List.map(i -> {
+            let r = Layout.bookmarkItem(env#fit, i, count);
+            RawDraw.lineSeg({ x = r#position#x, y = r#position#y + 14.0 }, { x = r#position#x, y = r#position#y + r#size#y - 14.0 },
+                            1.0, Color.mix(t#ink, t#panel, 0.6), zPanel() + 2)
+        });
+        let cells = items |> List.zipWithIndex |> List.flatMap(match (i, item) -> {
+            let r = Layout.bookmarkItem(env#fit, i, count);
+            popupItem(atlas, env, r, item, i == cursor or isOver(r, env))
+        });
+        List.flatten(popupGround(env, Layout.bookmarkBox(env#fit, count)) :: dividers :: cells :: Nil)
+
+    /// 小さなメニューの項目の言葉（… の「タイトルへ」だけ、下の帯の「タイトル」と言葉を分ける）。
+    def menuLabel(item: World.Button): StoryDoc.Label = match item {
+        case World.Button.ToTitle => StoryDoc.Label.BackToTitle
+        case _                    => buttonLabel(item)
+    }
 
     // ── 選択肢 ──
 
@@ -499,6 +602,7 @@ mod View {
         case World.Button.Hide      => StoryDoc.Label.Hide
         case World.Button.ToTitle   => StoryDoc.Label.ToTitle
         case World.Button.Menu      => StoryDoc.Label.Menu
+        case World.Button.Bookmark  => StoryDoc.Label.Bookmark
     }
 
     // ── タイトル ──
@@ -510,7 +614,8 @@ mod View {
         let shade = portraitVeil(env, Stage.TextPos.Mid);
         let fit = env#fit;
         let heading = TextDraw.centered({ text = s#title, atlas = atlas, size = 84.0, color = t#ink, z = zText(), centerX = center, y = Layout.titleHeadingY(fit) });
-        let sub = TextDraw.centered({ text = s#subtitle, atlas = atlas, size = 18.0, color = t#inkSeen, z = zText(), centerX = center, y = Layout.titleSubtitleY(fit) + 40.0 });
+        let sub = if (String.isEmpty(s#subtitle)) Nil
+                  else TextDraw.centered({ text = s#subtitle, atlas = atlas, size = 18.0, color = t#inkSeen, z = zText(), centerX = center, y = Layout.titleSubtitleY(fit) + 40.0 }) :: Nil;
         let placed = WorldMenu.titleItems() |> List.zipWithIndex;
         let count = List.length(placed);
         let items = placed |> List.map(match (i, item) -> {
@@ -522,9 +627,8 @@ mod View {
             let r = Layout.titleItem(fit, i, count);
             at(r#position#x + 50.0, r#position#y + r#size#y - 3.0, RawDraw.box({ x = r#size#x - 100.0, y = 1.0 }, t#accent, zText()) |> Render.fade(0.6))
         }) |> Option.toList;
-        let hint = TextDraw.centered({ text = s#hint, atlas = atlas, size = captionSize(env, 13.0), color = Color.mix(t#ink, t#panel, 0.4), z = zText(),
-                                       centerX = center, y = Layout.titleHintY(fit) });
-        List.flatten(shade :: (heading :: sub :: Nil) :: marker :: (hint :: items) :: Nil)
+        // WhyNot: 下に操作の案内を描かない — 項目そのものが押せる物として読め、指の端末で「クリックか Enter」は誤りになる。
+        List.flatten(shade :: (heading :: sub) :: marker :: items :: Nil)
 
     pub def titleLabel(item: World.TitleItem): StoryDoc.Label = match item {
         case World.TitleItem.NewGame  => StoryDoc.Label.NewGame
@@ -574,6 +678,7 @@ mod View {
                 slotsPanel(atlas, env, StoryDoc.Label.LoadTitle, { tabs = Saves.tabs(), tab = tab, cursor = i }, screenOf)
             case World.Panel.Settings(at)      => settingsPanel(atlas, env, at)
             case World.Panel.Menu(cursor)      => menuPanel(atlas, env, cursor)
+            case World.Panel.Bookmark(cursor)  => bookmarkPanel(atlas, env, cursor)
         }
 
     /// 画面の地・左上の見出しと下の線・右上の「戻る」・下の案内（空なら出さない）。
@@ -788,7 +893,15 @@ mod View {
         let k = Float64.min(r#size#x / Layout.width(env#fit), r#size#y / Layout.height(env#fit));
         let small = shown |> Render.scaledAllAround(k, { x = 0.0, y = 0.0 }) |> Render.movedAll(r#position)
             |> List.map(Render.overItem(liftedZ(zThumb()))) |> Render.clippedAll(r);
-        List.append(small, frameOf(r, Color.mix(t#ink, t#panel, 0.6), zThumbTop()))
+        // 写真がまだ届いていない枠は、暗い地（backdropsIn が写真を描かない）の右下に待ちの印。
+        let photoMissing = screen |> Option.exists(read -> stagePhotoMissing(env, read#stage));
+        let mark = if (photoMissing) waitDots(env, { x = r#position#x + r#size#x - 30.0, y = r#position#y + r#size#y - 12.0 }, 0.6, zThumbTop() + 1) else Nil;
+        List.flatten(small :: frameOf(r, Color.mix(t#ink, t#panel, 0.6), zThumbTop()) :: mark :: Nil)
+
+    /// 舞台の写真が、まだ届いていない後回しの絵か。
+    def stagePhotoMissing(env: Env, stage: Stage.Stage): Bool =
+        stage#shot |> Option.flatMap(shot -> BackdropDoc.textureOf(shot#photo, env#res#backdrops))
+            |> Option.exists(texture -> Set.memberOf(texture, env#res#missing))
 
     /// 絵 1 つの重なり順を dz だけ手前へ（Clipped は中身）。
     def liftedZ(dz: Int32): Render.Item -> Render.Item = item -> match item {
@@ -883,7 +996,7 @@ mod View {
                     at(bar#position#x, bar#position#y, RawDraw.box(bar#size, Color.lighten(t#panel, 0.18), zPanelText()) |> Render.rounded(3.0))
                     :: at(bar#position#x, bar#position#y, RawDraw.box({ x = bar#size#x * filled, y = bar#size#y }, t#accent, zPanelText() + 1) |> Render.rounded(3.0))
                     :: RawDraw.circleAt({ x = knobX, y = bar#position#y + bar#size#y / 2.0 }, if (picked) 8.0 else 7.0, if (picked) t#accent else t#ink, zPanelText() + 2)
-                    :: textRight(row#position#x + row#size#x, row#position#y + text#valueTop, valueText(slider, v), atlas, text#value, t#inkSeen, zPanelText())
+                    :: textRight(row#position#x + row#size#x, row#position#y + text#valueTop, valueText(slider, v, env), atlas, text#value, t#inkSeen, zPanelText())
                     :: Nil) :: Nil)
             case World.Setting.Pair(pair) =>
                 let chosen = WorldSettings.sideOf(pair, config);
@@ -912,7 +1025,8 @@ mod View {
         let length = Int32.toFloat64(String.length(sample));
         let cycle = length / Float64.max(1.0, cps) + 1.6;
         let elapsed = realSeconds(env) - Float64.floor(realSeconds(env) / cycle) * cycle;
-        let visible = Float64.tryToInt32(Float64.floor(elapsed * cps)) |> Option.getWithDefault(0) |> Int32.min(String.length(sample));
+        let visible = if (KindDoc.isNoWait(cps, env#res#kind)) String.length(sample)
+                      else Float64.tryToInt32(Float64.floor(elapsed * cps)) |> Option.getWithDefault(0) |> Int32.min(String.length(sample));
         let size = 16.0;
         at(r#position#x, r#position#y,
            Render.vgrad(r#size, { top = t#panel, bottom = Color.darken(t#panel, 0.3) }, zCard()) |> Render.fade(windowAlpha(env))
@@ -935,10 +1049,10 @@ mod View {
         case World.Setting.Reset                               => StoryDoc.Label.Reset
     }
 
-    def valueText(slider: World.Slider, v: Float64): String =
+    def valueText(slider: World.Slider, v: Float64, env: Env): String =
         let whole = x -> Float64.tryToInt32(Float64.round(x)) |> Option.getWithDefault(0) |> Int32.toString;
         match slider {
-            case World.Slider.TextSpeed => "${whole(v)} 字/秒"
+            case World.Slider.TextSpeed => if (KindDoc.isNoWait(v, env#res#kind)) "ノーウェイト" else "${whole(v)} 字/秒"
             case World.Slider.AutoWait  => "${Float64.toString(Float64.round(v * 10.0) / 10.0)} 秒"
             case _                      => "${whole(v * 100.0)}%"
         }

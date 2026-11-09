@@ -21,11 +21,7 @@
     },
     "subtitle": {
       "type": "string",
-      "description": "タイトル画面の題の下の 1 行"
-    },
-    "hint": {
-      "type": "string",
-      "description": "タイトル画面の下の操作の案内"
+      "description": "タイトル画面の題の下の 1 行（空なら描かない。人が指定した時だけ書く）"
     },
     "titlePhoto": {
       "type": "string",
@@ -102,6 +98,12 @@
           "type": "string"
         },
         "menu": {
+          "type": "string"
+        },
+        "bookmark": {
+          "type": "string"
+        },
+        "backToTitle": {
           "type": "string"
         },
         "saveTitle": {

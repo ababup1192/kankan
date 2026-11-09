@@ -399,6 +399,80 @@
     ]
   },
   "web": {
+    "startPrompt": "タッチして開始",
+    "compress": {
+      "lossyImages": [
+        {
+          "glob": "assets/bg/*.jpg",
+          "quality": 85
+        }
+      ]
+    },
+    "embed": [
+      "assets/talk/dialogue.json"
+    ],
+    "omit": [
+      "assets/talk/*.yarn",
+      "assets/*.schema.json"
+    ],
+    "// deferred": "押して始めた後に裏で取る素材（シナリオで出てくる順）。タイトルの写真（corridor）と環境音（title）、タイトルで鳴る返事の音（ui_cursor・ui_open・ロードの ui_save）は起動時に取る。届く前に使う所は暗転で待つ（背景・環境音）か、鳴らさずに進む（一発の音）。廊下の写真は本文でも使うが起動時に取ってある。",
+    "deferred": [
+      "assets/bg/living.jpg",
+      "assets/sfx/amb_room.wav",
+      "assets/sfx/ui_page.wav",
+      "assets/sfx/ui_choice.wav",
+      "assets/bg/bedroom.jpg",
+      "assets/bg/switch.jpg",
+      "assets/sfx/se_switch.wav",
+      "assets/bg/ceiling.jpg",
+      "assets/sfx/se_kan_far.wav",
+      "assets/sfx/amb_drone.wav",
+      "assets/bg/kitchen.jpg",
+      "assets/sfx/amb_tension.wav",
+      "assets/bg/woman.jpg",
+      "assets/sfx/amb_heart.wav",
+      "assets/sfx/se_hit.wav",
+      "assets/sfx/se_run.wav",
+      "assets/bg/sister.jpg",
+      "assets/bg/sisterdown.jpg",
+      "assets/sfx/amb_clock.wav",
+      "assets/bg/desk.jpg",
+      "assets/sfx/se_kan_door.wav",
+      "assets/bg/door.jpg",
+      "assets/bg/wall.jpg",
+      "assets/sfx/se_knock.wav",
+      "assets/sfx/se_creak.wav",
+      "assets/bg/blue.jpg",
+      "assets/sfx/se_kan.wav",
+      "assets/bg/face.jpg",
+      "assets/bg/hammer.jpg",
+      "assets/sfx/se_laugh_woman.wav",
+      "assets/sfx/amb_morning.wav",
+      "assets/bg/bed.jpg",
+      "assets/bg/breakfast.jpg",
+      "assets/sfx/amb_evening.wav",
+      "assets/bg/entry.jpg",
+      "assets/sfx/se_frontdoor.wav",
+      "assets/sfx/se_door.wav",
+      "assets/sfx/se_stairs.wav",
+      "assets/bg/stairs.jpg",
+      "assets/bg/alley.jpg",
+      "assets/sfx/amb_store.wav",
+      "assets/bg/store.jpg",
+      "assets/sfx/se_pant.wav",
+      "assets/sfx/se_autodoor.wav",
+      "assets/bg/payphone.jpg",
+      "assets/sfx/se_coin.wav",
+      "assets/sfx/se_dial.wav",
+      "assets/sfx/amb_line.wav",
+      "assets/bg/receiver.jpg",
+      "assets/sfx/se_ring.wav",
+      "assets/sfx/se_pick.wav",
+      "assets/bg/livingphone.jpg",
+      "assets/sfx/se_laugh_mother.wav",
+      "assets/sfx/se_hang.wav",
+      "assets/sfx/se_busy.wav"
+    ],
     "keysDoc": "assets/novel.keys.json",
     "touchGestures": {
       "longPress": "back",

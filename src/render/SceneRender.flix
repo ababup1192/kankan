@@ -88,7 +88,7 @@ mod SceneRender {
         ("small-title", "title") :: ("small-nvl", "nvl") :: ("small-adv", "adv") :: ("small-choice", "choice")
             :: ("small-save", "save") :: ("small-settings", "settings") :: ("small-ask", "ask") :: Nil
 
-    /// 縦の画面で描く場面: (描き出しの名前, 場面の名前, 画面の大きさ)。World は Shots の同じ場面の物をそのまま使う（menu だけは worldOf）。
+    /// 縦の画面で描く場面: (描き出しの名前, 場面の名前, 画面の大きさ)。World は Shots の同じ場面の物をそのまま使う（menu と bookmark だけは worldOf）。
     /// 太い縦の画面（360×640）は縦の design の下限の高さで、並べ方がいちばん窮屈になる所を見る。
     def portraitShots(): List[(String, String, Vec2.Vec2)] =
         let tall = Display.defaultPortraitView();
@@ -97,16 +97,19 @@ mod SceneRender {
             :: ("portrait-face", "face", tall) :: ("portrait-log", "log", tall) :: ("portrait-save", "save", tall)
             :: ("portrait-settings", "settings", tall) :: ("portrait-ask", "ask", tall)
             :: ("portrait-phone", "phone", tall) :: ("portrait-menu", "menu", tall)
+            :: ("portrait-bookmark", "bookmark", tall)
             :: ("portrait-short-nvl", "nvl", short) :: ("portrait-short-save", "save", short)
             :: ("portrait-short-settings", "settings", short) :: Nil
 
-    /// 場面の名前 → World。menu = 縦の画面だけの場面（ADV の台詞の上で、オートを点けて歯車のメニューを開いた所）。
-    // WhyNot: menu を Shots.names に入れない — 歯車のメニューは縦の画面にしか無く、Shots.names は横の描き出しと実機の START=shot: の口でもある。
-    def worldOf(scene: String, res: Res.Res): Option[World.World] =
-        if (scene == "menu")
-            Shots.worldOf("adv", res) |> Option.map(w ->
-                World.mapRead(r -> { playback = World.Playback.Auto | r }, { panel = World.Panel.Menu(0) | w }))
-        else Shots.worldOf(scene, res)
+    /// 場面の名前 → World。縦の画面だけの場面: menu = 台詞の上で、オートを点けて右上の … のメニューを開いた所、
+    /// bookmark = 同じ所でしおりの [セーブ｜ロード] を開いた所。
+    // WhyNot: menu と bookmark を Shots.names に入れない — … としおりは縦の画面にしか無く、Shots.names は横の描き出しと実機の START=shot: の口でもある。
+    def worldOf(scene: String, res: Res.Res): Option[World.World] = match scene {
+        case "menu"     => Shots.worldOf("woman", res) |> Option.map(w ->
+                               World.mapRead(r -> { playback = World.Playback.Auto | r }, { panel = World.Panel.Menu(0) | w }))
+        case "bookmark" => Shots.worldOf("woman", res) |> Option.map(w -> { panel = World.Panel.Bookmark(0) | w })
+        case _          => Shots.worldOf(scene, res)
+    }
 
     /// 描き出せる名前の全部（Shots の場面と、小さい画面と縦の画面の場面）。
     def allNames(): List[String] =

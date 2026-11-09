@@ -25,15 +25,6 @@ fit = """<style>
     root.setProperty("--fit-top", (v ? v.offsetTop : 0) + "px");
     window.scrollTo(0, 0);
   }
-  // iOS は押せる物でない所のタップに click を出さないので、「タップで始める」の間だけ指の pointerup と touchend を click へ替える。
-  // WhyNot: pointerdown にしない — 指の pointerdown は操作に数えられず、音を起こせない。マウスは click が来るので読み飛ばす。
-  function tapStart(e) {
-    if (e.pointerType === "mouse") return;
-    var start = document.getElementById("fge-start");
-    if (start && getComputedStyle(start).display !== "none") window.dispatchEvent(new MouseEvent("click"));
-  }
-  window.addEventListener("pointerup", tapStart);
-  document.addEventListener("touchend", tapStart, { passive: true });
   fit();
   window.addEventListener("resize", fit);
   window.addEventListener("orientationchange", fit);

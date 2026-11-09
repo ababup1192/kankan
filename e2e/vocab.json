@@ -30,6 +30,7 @@
     {"name": "shot:woman", "doc": "ギャラリーの場面（gallery/woman.png）", "args": {}},
     {"name": "shot:face", "doc": "ギャラリーの場面（gallery/face.png）", "args": {}},
     {"name": "shot:phone", "doc": "ギャラリーの場面（gallery/phone.png）", "args": {}},
+    {"name": "shot:hold", "doc": "ギャラリーの場面（gallery/hold.png）", "args": {}},
     {"name": "shot:log", "doc": "ギャラリーの場面（gallery/log.png）", "args": {}},
     {"name": "shot:save", "doc": "ギャラリーの場面（gallery/save.png）", "args": {}},
     {"name": "shot:load", "doc": "ギャラリーの場面（gallery/load.png）", "args": {}},

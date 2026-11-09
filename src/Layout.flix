@@ -131,7 +131,11 @@ mod Layout {
             case Stage.TextPos.Mid    => (h * 0.38, bottom)
             case Stage.TextPos.Bottom => (h * 0.57, bottom)
         };
-        rect(full#position#x, top, full#size#x, Float64.max(0.0, end - top))
+        let right = match (fit, pos) {
+            case (Fit.Portrait(p, _), Stage.TextPos.Top) => Float64.min(full#position#x + full#size#x, railLeft(fit, p) - 12.0)
+            case _                                         => full#position#x + full#size#x
+        };
+        rect(full#position#x, top, right - full#position#x, Float64.max(0.0, end - top))
 
     /// 縦の画面の頁で、行と行の間の空き。
     pub def paragraphGap(): Float64 = 26.0
@@ -139,7 +143,7 @@ mod Layout {
     // ── 選択肢 ──
 
     /// i 番目（count 個のうち）の選択肢の矩形。横は ADV のウィンドウに被らないよう、ウィンドウの上の空きの真ん中へ並べる。
-    /// 縦は頁の下（操作の列の上）へ下から積む。
+    /// 縦は頁の下へ下から積む。
     pub def choice(fit: Fit, i: Int32, count: Int32): Rect2.Rect2 = match fit {
         case Fit.Regular        => landscapeChoice(fit, { x = 220.0, w = 520.0, h = 46.0, gap = 12.0 }, i, count)
         case Fit.Small(s)       => landscapeChoice(fit, { x = 180.0, w = 600.0, h = s#choiceHeight, gap = 10.0 }, i, count)
@@ -164,25 +168,40 @@ mod Layout {
 
     // ── クイックメニュー（下の帯） ──
 
-    /// 下の帯の上端。
+    /// 下の帯の上端（縦の画面は頁と選択肢の下端の目安。縦の画面に下の帯は無い）。
     def buttonTop(fit: Fit): Float64 = match fit {
         case Fit.Regular        => 512.0
         case Fit.Small(s)       => height(fit) - s#buttonHeight
         // WhyNot: 下端に寄せない — 下にツールバーを重ねるブラウザは、隠している高さを頁へ知らせない。
-        case Fit.Portrait(p, _) => height(fit) - 124.0 - p#buttonHeight
+        case Fit.Portrait(_, _) => height(fit) - 196.0
     }
 
-    /// i 番目のボタン（count 個を画面の真ん中に並べる）。Small は左右に 8px ずつ残して画面の幅を同じ幅で分ける。
-    /// 縦は丸いアイコンの直径に間 35 px を足した幅で真ん中に寄せる（375 幅の画面で丸の中心どうしが 58 CSS px・押せる幅は buttonHeight 以上）。
-    pub def button(fit: Fit, i: Int32, count: Int32): Rect2.Rect2 =
-        let n = Int32.toFloat64(Int32.max(1, count));
-        let (w, h) = match fit {
-            case Fit.Regular        => (64.0, 24.0)
-            case Fit.Small(s)       => (Float64.min(96.0, (width(fit) - 16.0) / n), s#buttonHeight)
-            case Fit.Portrait(p, _) => (Float64.max(p#buttonHeight, p#iconSize + 35.0), p#buttonHeight)
-        };
-        let x0 = (width(fit) - Int32.toFloat64(count) * w) / 2.0;
-        rect(x0 + Int32.toFloat64(i) * w, buttonTop(fit), w, h)
+    /// i 番目のボタン。横は count 個を画面の真ん中に並べる（Small は左右に 8px ずつ残して画面の幅を同じ幅で分ける）。
+    /// 縦は右端の縦の列に上から積む（railButton）。
+    pub def button(fit: Fit, i: Int32, count: Int32): Rect2.Rect2 = match fit {
+        case Fit.Portrait(p, _) => railButton(fit, p, i)
+        case _ =>
+            let n = Int32.toFloat64(Int32.max(1, count));
+            let (w, h) = match fit {
+                case Fit.Small(s) => (Float64.min(96.0, (width(fit) - 16.0) / n), s#buttonHeight)
+                case _            => (64.0, 24.0)
+            };
+            let x0 = (width(fit) - Int32.toFloat64(count) * w) / 2.0;
+            rect(x0 + Int32.toFloat64(i) * w, buttonTop(fit), w, h)
+    }
+
+    /// 縦の画面の右端の列と右上の … の丸の中心の x（右端から railRight の余白を空けた所に丸の右端が来る）。
+    def railCenterX(fit: Fit, p: PortraitDoc.Rec): Float64 = width(fit) - p#railRight - p#iconSize / 2.0
+
+    /// 縦の画面の右の列の i 番目の押せる正方形（辺 buttonHeight）。右上の … のすぐ下から下へ積む。
+    // WhyNot: 列を画面の下（親指の近く）に寄せない — 下の帯は字を積む所で、人物も下半分に立つことが多い。上の字は Top の頁を列の左までに縮めて避ける。
+    def railButton(fit: Fit, p: PortraitDoc.Rec, i: Int32): Rect2.Rect2 =
+        let top = p#moreTop + p#moreHeight + p#railGap;
+        let s = p#buttonHeight;
+        rect(railCenterX(fit, p) - s / 2.0, top + Int32.toFloat64(i) * s, s, s)
+
+    /// 縦の画面の右の列の左端（しおりのメニュー・ツールチップ・上の頁はこれより左に置く）。
+    def railLeft(fit: Fit, p: PortraitDoc.Rec): Float64 = railCenterX(fit, p) - p#buttonHeight / 2.0
 
     /// 横の画面のボタンの字の大きさ（縦の画面は字の無いアイコン）。
     pub def buttonTextSize(fit: Fit): Float64 = match fit {
@@ -190,7 +209,7 @@ mod Layout {
         case _            => 13.0
     }
 
-    /// 縦の画面の i 番目のボタンの丸いアイコンの中心と半径（押せる矩形 button の真ん中）。
+    /// i 番目のボタンの丸いアイコンの中心と半径（押せる矩形 button の真ん中）。
     pub def icon(fit: Fit, i: Int32, count: Int32): { center = Vec2.Vec2, radius = Float64 } =
         let r = button(fit, i, count);
         let diameter = match fit {
@@ -199,25 +218,54 @@ mod Layout {
         };
         { center = { x = r#position#x + r#size#x / 2.0, y = r#position#y + r#size#y / 2.0 }, radius = diameter / 2.0 }
 
-    // ── 縦の画面の歯車のメニュー ──
+    // ── 縦の画面の右上の …・… のメニュー・しおりのメニュー・ツールチップ ──
 
-    /// メニューの i 番目（count 個のうち）の項目。歯車（操作の列の最後）の右端にそろえ、列の上へ下から積む。
-    pub def menuItem(fit: Fit, i: Int32, count: Int32, buttonCount: Int32): Rect2.Rect2 =
-        let gear = button(fit, buttonCount - 1, buttonCount);
-        let h = match fit {
-            case Fit.Portrait(p, _) => p#menuItemHeight
-            case _                  => 44.0
-        };
-        let w = 240.0;
-        let right = Float64.min(width(fit) - margin(), gear#position#x + gear#size#x);
-        let top = gear#position#y - 16.0 - Int32.toFloat64(count) * h;
-        rect(right - w, top + Int32.toFloat64(i) * h, w, h)
+    /// 縦の画面の大きさの Doc（横の画面は既定値。横に … としおりは出さない）。
+    def portraitOf(fit: Fit): PortraitDoc.Rec = match fit {
+        case Fit.Portrait(p, _) => p
+        case _                  => PortraitDoc.rec(PortraitDoc.defaults())
+    }
 
-    /// メニューの地（項目を囲む余白つきの矩形）。
-    pub def menuBox(fit: Fit, count: Int32, buttonCount: Int32): Rect2.Rect2 =
-        let first = menuItem(fit, 0, count, buttonCount);
-        let last = menuItem(fit, count - 1, count, buttonCount);
-        rect(first#position#x - 8.0, first#position#y - 8.0, first#size#x + 16.0, last#position#y + last#size#y - first#position#y + 16.0)
+    /// 右上の … の丸（中心と半径）と押せる正方形。中心の x は右の列と同じ（列と 1 本の縦にそろう）。
+    pub def moreButton(fit: Fit): { center = Vec2.Vec2, radius = Float64, hit = Rect2.Rect2 } =
+        let p = portraitOf(fit);
+        let s = p#moreHeight;
+        let c = { x = railCenterX(fit, p), y = p#moreTop + s / 2.0 };
+        { center = c, radius = p#moreSize / 2.0, hit = rect(c#x - s / 2.0, c#y - s / 2.0, s, s) }
+
+    /// … のメニューの i 番目の項目。… の下に、右端を画面の右の余白にそろえて縦に並べる。
+    pub def menuItem(fit: Fit, i: Int32): Rect2.Rect2 =
+        let p = portraitOf(fit);
+        let more = moreButton(fit)#hit;
+        let right = width(fit) - p#railRight;
+        rect(right - p#menuWidth, more#position#y + more#size#y + 10.0 + Int32.toFloat64(i) * p#menuItemHeight, p#menuWidth, p#menuItemHeight)
+
+    /// メニューの地（count 個の項目を囲む余白つきの矩形）。
+    pub def menuBox(fit: Fit, count: Int32): Rect2.Rect2 = boxAround(menuItem(fit, 0), menuItem(fit, count - 1))
+
+    /// しおりのメニューの i 番目（左から [セーブ｜ロード]）。しおりのボタン（列の一番上）の左に、丸の高さの真ん中で横に並べる。
+    pub def bookmarkItem(fit: Fit, i: Int32, count: Int32): Rect2.Rect2 =
+        let p = portraitOf(fit);
+        let mark = button(fit, 0, 0);
+        let w = p#bookmarkItemWidth;
+        let h = p#menuItemHeight;
+        let right = railLeft(fit, p) - 12.0;
+        rect(right - Int32.toFloat64(count) * w + Int32.toFloat64(i) * w, mark#position#y + mark#size#y / 2.0 - h / 2.0, w, h)
+
+    /// しおりのメニューの地（count 個の項目を囲む余白つきの矩形）。
+    pub def bookmarkBox(fit: Fit, count: Int32): Rect2.Rect2 = boxAround(bookmarkItem(fit, 0, count), bookmarkItem(fit, count - 1, count))
+
+    /// 最初と最後の項目を 8 px の余白で囲む矩形。
+    def boxAround(first: Rect2.Rect2, last: Rect2.Rect2): Rect2.Rect2 =
+        rect(first#position#x - 8.0, first#position#y - 8.0,
+             last#position#x + last#size#x - first#position#x + 16.0, last#position#y + last#size#y - first#position#y + 16.0)
+
+    /// 長押しのツールチップの右端と真ん中の高さ（i 番目のボタンの押せる正方形の左）。
+    pub def tooltipAnchor(fit: Fit, i: Int32): Vec2.Vec2 =
+        let r = button(fit, i, 0);
+        { x = r#position#x - 4.0, y = r#position#y + r#size#y / 2.0 }
+
+    pub def tooltipTextSize(fit: Fit): Float64 = portraitOf(fit)#tooltipTextSize
 
     pub def menuItemTextSize(fit: Fit): Float64 = match fit {
         case Fit.Portrait(p, _) => p#menuItemTextSize
@@ -240,18 +288,18 @@ mod Layout {
         case Fit.Portrait(_, _) => titleHeadingY(fit) + 96.0
     }
 
-    /// タイトル画面の下の案内の高さ。
-    pub def titleHintY(fit: Fit): Float64 = match fit {
+    /// タイトル画面のメニューを並べる下の端（Small と縦は subtitle の下からここまでの真ん中へ寄せる）。
+    pub def titleMenuBottomY(fit: Fit): Float64 = match fit {
         case Fit.Portrait(_, _) => height(fit) - 48.0
         case _                  => 512.0
     }
 
-    /// i 番目（count 個のうち）のメニューの項目。Small と縦は subtitle の下から下の案内の上までの真ん中へ並べる。
+    /// i 番目（count 個のうち）のメニューの項目。Small と縦は subtitle の下から titleMenuBottomY までの真ん中へ並べる。
     pub def titleItem(fit: Fit, i: Int32, count: Int32): Rect2.Rect2 =
         let centered = (itemHeight, x, w) -> {
             let step = itemHeight + 2.0;
             let total = Int32.toFloat64(count) * step - 2.0;
-            let top = (titleSubtitleY(fit) + 22.0 + titleHintY(fit) - 4.0) / 2.0 - total / 2.0;
+            let top = (titleSubtitleY(fit) + 22.0 + titleMenuBottomY(fit) - 4.0) / 2.0 - total / 2.0;
             rect(x, top + Int32.toFloat64(i) * step, w, itemHeight)
         };
         match fit {
