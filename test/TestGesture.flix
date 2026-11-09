@@ -3,7 +3,7 @@
 // 動いた量と秒は novel.kind.json・novel.portrait.json の数から導く（Doc の値を変えてもテストは壊れない）。
 mod TestGesture {
 
-    use fge::{App, Clock, Display}
+    use fge::{App, Clock, Display, Rect2}
     use fge::GameEngine.Key
     use TestKit.{begun, quiet, settle}
 
@@ -269,4 +269,90 @@ mod TestGesture {
         let p = center(Layout.back(portrait(res)));
         let w = play(res, down(0.0, p) :: up(0.1, p) :: Nil, opened);
         Assert.assertEq(expected = ("Closed", World.talkLineOf(reading)), (World.panelName(w), World.talkLineOf(w)))
+
+    /// ブラウザ版で指を縦に払った 1 回: 動かしている間はホイールの刻み（指を下へ = 上へ回した向き = 正）だけが来て、
+    /// 離したフレームで touchGestures の swipeUp / swipeDown = advance のキーが 1 回来る。左ボタンは一度も押さない。
+    def fingerSwipe(res: Res.Res, wheel: Float64, w: World.World): World.World =
+        let advance = KeysDoc.rec(res#keys)#advance |> List.head |> Option.getWithDefault(Key.PageDown);
+        let moving = { wheel = wheel | App.emptyFrame() };
+        let release = { justPressed = Set#{advance}, down = Set#{advance} | App.emptyFrame() };
+        play(res, moving :: moving :: release :: Nil, w)
+
+    @Test
+    def testVerticalFingerSwipesAdvanceOneLineEach(): Unit \ {Assert, Fs.FileRead} =
+        // 下へ払っても上へ払っても、1 行だけ送り、バックログは開かない（離した時の 1 行送りと押しの分け方とで 2 重に送らない）。
+        let res = TestKit.res();
+        let start = begun(res);
+        let pulled = fingerSwipe(res, 1.0, start);
+        let pushed = fingerSwipe(res, -1.0, start);
+        let once = World.talkLineOf(TestKit.advance(res, start));
+        Assert.assertEq(expected = ((once, "Closed"), (once, "Closed")),
+                        ((World.talkLineOf(pulled), World.panelName(pulled)), (World.talkLineOf(pushed), World.panelName(pushed))))
+
+    @Test
+    def testWheelUpWhileReadingDoesNotOpenTheLog(): Unit \ {Assert, Fs.FileRead} =
+        // 読んでいる間に上へホイールを回しても、バックログは開かず台詞も進まない（ログは画面のボタンとキーで開く）。
+        let res = TestKit.res();
+        let start = begun(res);
+        let w = play(res, { wheel = 1.0 | App.emptyFrame() } :: Nil, start);
+        Assert.assertEq(expected = ("Closed", World.talkLineOf(start)), (World.panelName(w), World.talkLineOf(w)))
+
+    def isTitle(w: World.World): Bool = match w#scene {
+        case World.Scene.Title(_) => true
+        case _                    => false
+    }
+
+    @Test
+    def testAdvanceKeyDoesNothingOnTitle(): Unit \ {Assert, Fs.FileRead} =
+        // タイトルで縦に払っても（決定と違って）カーソルの項目を選ばず、タイトルのまま。
+        let res = TestKit.res();
+        let w = fingerSwipe(res, 1.0, TestKit.w0(res));
+        Assert.assertTrue(isTitle(w))
+
+    def logOffsetOf(w: World.World): Float64 = match w#panel {
+        case World.Panel.Log(offset) => offset
+        case _                       => -1.0
+    }
+
+    @Test
+    def testWheelUpScrollsTheLog(): Unit \ {Assert, Fs.FileRead} =
+        // バックログの中で上へホイールを回すと、遡る（閉じない）。
+        let res = TestKit.res();
+        let read = List.range(0, 12) |> List.foldLeft((acc, _) -> TestKit.settle(res, TestKit.advance(res, acc)), begun(res));
+        let opened = quiet(() -> WorldLog.openLog(read));
+        let w = play(res, { wheel = 1.0 | App.emptyFrame() } :: Nil, opened);
+        Assert.assertTrue(logOffsetOf(w) > logOffsetOf(opened))
+
+    /// 設定の行 i で、最大にしたつまみ（選んだ時の半径 8）の矩形と、右に寄せた一番長い値の字「ノーウェイト」（全角 1 字 = 字の大きさ 1 つ分）の矩形。
+    def knobAndLongestValue(fit: Layout.Fit, i: Int32): (Rect2.Rect2, Rect2.Rect2) =
+        let bar = Layout.settingBar(fit, i);
+        let row = Layout.settingRow(fit, i);
+        let text = Layout.settingText(fit);
+        let width = Int32.toFloat64(String.length("ノーウェイト")) * text#value;
+        let knob = { position = { x = bar#position#x + bar#size#x - 8.0, y = bar#position#y + bar#size#y / 2.0 - 8.0 }, size = { x = 16.0, y = 16.0 } };
+        let value = { position = { x = row#position#x + row#size#x - width, y = row#position#y + text#valueTop }, size = { x = width, y = text#value } };
+        (knob, value)
+
+    def sliderRow(i: Int32, setting: World.Setting): Option[Int32] = match setting {
+        case World.Setting.Slider(_) => Some(i)
+        case _                       => None
+    }
+
+    def overlaps(a: Rect2.Rect2, b: Rect2.Rect2): Bool =
+        a#position#x < b#position#x + b#size#x and b#position#x < a#position#x + a#size#x and
+        a#position#y < b#position#y + b#size#y and b#position#y < a#position#y + a#size#y
+
+    def knobsTouchingTheLongestValue(fits: List[Layout.Fit]): Int32 =
+        let sliders = WorldSettings.settings() |> List.zipWithIndex |> List.filterMap(match (i, setting) -> sliderRow(i, setting));
+        fits |> List.flatMap(fit -> sliders |> List.map(knobAndLongestValue(fit)))
+             |> List.count(match (knob, value) -> overlaps(knob, value))
+
+    @Test
+    def testSliderKnobNeverTouchesTheLongestValueText(): Unit \ {Assert, Fs.FileRead} =
+        // 横・横持ちのスマホ・縦（細長い・太い）のどれでも、どのスライダーの行でも、最大にしたつまみと一番長い値の字が重ならない。
+        let res = TestKit.res();
+        let fits = Layout.Fit.Regular :: Layout.fitOf(Display.SizeClass.Small, Display.Orientation.Landscape, Layout.size(Layout.Fit.Regular), res#smallScreen, res#portrait)
+                   :: Layout.fitOf(Display.SizeClass.Small, Display.Orientation.Portrait, { x = 540.0, y = 1169.0 }, res#smallScreen, res#portrait)
+                   :: Layout.fitOf(Display.SizeClass.Small, Display.Orientation.Portrait, { x = 540.0, y = 960.0 }, res#smallScreen, res#portrait) :: Nil;
+        Assert.assertEq(expected = 0, knobsTouchingTheLongestValue(fits))
 }
